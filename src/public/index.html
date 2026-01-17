@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="快速分享文本内容，无需登录，生成唯一分享链接">
+  <meta name="keywords" content="文本分享,剪贴板,paste,分享链接">
+  <title>文本分享 - TextShare</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📋 文本分享</h1>
+      <p>快速分享文本内容，无需登录，生成唯一分享链接</p>
+    </header>
+
+    <main class="card">
+      <form id="shareForm">
+        <div class="form-group">
+          <label for="textContent">文本内容</label>
+          <textarea 
+            id="textContent" 
+            name="content" 
+            placeholder="在此粘贴或输入要分享的文本内容..."
+            required
+          ></textarea>
+          <div id="charCounter" style="text-align: right; font-size: 12px; color: var(--text-muted); margin-top: 5px;">
+            0 / 102,400 字符
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="expireType">过期时间</label>
+          <select id="expireType" name="expireType">
+            <option value="never">永不过期</option>
+            <option value="1h">1小时后过期</option>
+            <option value="1d">1天后过期</option>
+            <option value="7d">7天后过期</option>
+            <option value="30d">30天后过期</option>
+            <option value="custom">自定义天数</option>
+          </select>
+        </div>
+
+        <div class="form-group custom-days" id="customDaysWrapper">
+          <label for="customDays">自定义天数（1-365）</label>
+          <input 
+            type="number" 
+            id="customDays" 
+            name="expireDays" 
+            min="1" 
+            max="365" 
+            value="7"
+            placeholder="请输入天数"
+          >
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary btn-block">
+          生成分享链接
+        </button>
+      </form>
+
+      <div class="result" id="result">
+        <div class="result-title">✅ 分享链接已生成</div>
+        <div class="result-link">
+          <input type="text" id="shareUrl" readonly>
+          <button type="button" id="copyBtn" class="btn btn-success">复制链接</button>
+        </div>
+        <div class="result-info" id="expireInfo"></div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© 2026 TextShare - 轻量级文本分享工具</p>
+    </footer>
+  </div>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

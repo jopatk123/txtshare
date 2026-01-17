@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  text-share:
+    build: .
+    container_name: text-share
+    restart: unless-stopped
+    ports:
+      - "6006:6006"
+    volumes:
+      # 数据库持久化
+      - ./data/db:/app/src/server/db
+      # 日志持久化（可选）
+      - ./data/logs:/app/src/server/logs
+    environment:
+      - NODE_ENV=production
+      - PORT=6006
+      - BASE_URL=https://script.jopatk.top

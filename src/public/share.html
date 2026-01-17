@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>查看分享 - TextShare</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📋 文本分享</h1>
+      <p>查看分享的文本内容</p>
+    </header>
+
+    <!-- 加载状态 -->
+    <div class="loading show" id="loading">
+      <div class="spinner"></div>
+      <p>加载中...</p>
+    </div>
+
+    <!-- 内容区域 -->
+    <main class="card" id="content" style="display: none;">
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="margin-bottom: 0;">分享内容</label>
+          <button type="button" id="copyBtn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+            📋 复制内容
+          </button>
+        </div>
+        <div class="text-content" id="textContent"></div>
+      </div>
+
+      <div class="meta-info">
+        <div class="meta-item">
+          <span>🕐 创建时间：</span>
+          <span id="createTime">-</span>
+        </div>
+        <div class="meta-item">
+          <span>⏰ 过期时间：</span>
+          <span id="expireTime">-</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <a href="/" class="btn btn-primary">创建新分享</a>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© 2026 TextShare - 轻量级文本分享工具</p>
+    </footer>
+  </div>
+
+  <script src="/js/share.js"></script>
+</body>
+</html>
