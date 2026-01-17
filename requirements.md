@@ -78,7 +78,7 @@ text-share/
     │   │   └── validator.js    # 文本校验/参数校验工具
     │   ├── db/                 # 数据库目录
     │   │   ├── init.sql        # 数据库初始化建表脚本
-    │   │   └── share_text.db   # SQLite核心数据库文件
+   │   │   └── data/share_text.db   # SQLite核心数据库文件（持久化目录）
     │   └── logs/               # 应用日志目录
     └── public/                  # 前端静态资源
         ├── index.html          # 主页面-生成分享链接

@@ -28,8 +28,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       loadingEl.classList.remove('show');
       contentEl.style.display = 'block';
 
-      // 显示文本内容
-      textContentEl.textContent = data.data.content;
+      // 显示文本内容：后端已做 HTML 转义，这里用 innerHTML 让实体正确显示
+      const escapedContent = typeof data.data.content === 'string' ? data.data.content : '';
+      textContentEl.innerHTML = escapedContent;
 
       // 显示创建时间
       if (data.data.createTime) {
@@ -42,12 +43,13 @@ document.addEventListener('DOMContentLoaded', async function() {
 
       // 设置复制功能
       copyBtn.addEventListener('click', function() {
+        const decoded = decodeHtmlEntities(escapedContent);
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(data.data.content)
+          navigator.clipboard.writeText(decoded)
             .then(() => showToast('内容已复制到剪贴板', 'success'))
-            .catch(() => fallbackCopy(data.data.content));
+            .catch(() => fallbackCopy(decoded));
         } else {
-          fallbackCopy(data.data.content);
+          fallbackCopy(decoded);
         }
       });
 
@@ -115,6 +117,15 @@ function showToast(message, type = 'success') {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+/**
+ * 将 HTML 实体反解为原始文本（用于复制）
+ */
+function decodeHtmlEntities(escaped) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = escaped;
+  return textarea.value;
 }
 
 /**

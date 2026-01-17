@@ -14,7 +14,7 @@
 ## 技术栈
 
 - **后端**: Node.js + Express
-- **数据库**: SQLite (better-sqlite3)
+- **数据库**: SQLite (sql.js)
 - **缓存**: node-cache
 - **定时任务**: node-schedule
 - **日志**: winston
@@ -72,7 +72,7 @@ docker build -t text-share .
 docker run -d \
   --name text-share \
   -p 6006:6006 \
-  -v $(pwd)/data/db:/app/src/server/db \
+  -v $(pwd)/data/db:/app/src/server/db/data \
   -v $(pwd)/data/logs:/app/src/server/logs \
   -e BASE_URL=https://script.jopatk.top \
   text-share

@@ -43,8 +43,23 @@ async function createShareText(req, res) {
       }
     }
 
-    // 生成唯一ID
-    const id = generateId(10);
+    // 生成唯一ID（极小概率会碰撞，这里做重试兜底）
+    let id = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = generateId(10);
+      const exists = shareTextModel.getShareTextById(candidate);
+      if (!exists) {
+        id = candidate;
+        break;
+      }
+    }
+
+    if (!id) {
+      return res.status(500).json({
+        success: false,
+        error: '生成分享链接失败，请稍后重试'
+      });
+    }
 
     // XSS转义处理
     const escapedContent = escapeHtml(content);
