@@ -21,6 +21,18 @@
 
 ## 本地开发
 
+### 快速启动（推荐）
+
+```bash
+# macOS/Linux
+./dev.sh
+
+# Windows
+dev.bat
+```
+
+### 手动启动
+
 ```bash
 # 安装依赖
 npm install
