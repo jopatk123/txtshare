@@ -3,11 +3,12 @@ const path = require('path');
 const fs = require('fs');
 
 const dbDir = path.join(__dirname);
-const dbPath = path.join(dbDir, 'share_text.db');
+const dataDir = path.join(dbDir, 'data');
+const dbPath = path.join(dataDir, 'share_text.db');
 
 // 确保目录存在
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
 }
 
 async function initDatabase() {

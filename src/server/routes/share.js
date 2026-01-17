@@ -51,9 +51,6 @@ router.get('/:id', (req, res) => {
       }
     }
 
-    // 增加访问次数
-    shareTextModel.incrementViewCount(id);
-
     logger.info(`Page accessed: /s/${id}`);
 
     // 返回分享页面

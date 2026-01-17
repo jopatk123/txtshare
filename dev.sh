@@ -13,7 +13,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # 检查数据库文件是否存在
-if [ ! -f "src/server/db/share_text.db" ]; then
+if [ ! -f "src/server/db/data/share_text.db" ]; then
   echo "💾 初始化数据库..."
   npm run init-db
   echo ""

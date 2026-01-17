@@ -9,7 +9,7 @@ services:
       - "6006:6006"
     volumes:
       # 数据库持久化
-      - ./data/db:/app/src/server/db
+      - ./data/db:/app/src/server/db/data
       # 日志持久化（可选）
       - ./data/logs:/app/src/server/logs
     environment:

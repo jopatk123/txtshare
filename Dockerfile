@@ -12,7 +12,7 @@ RUN npm ci --only=production
 COPY . .
 
 # 创建必要的目录
-RUN mkdir -p src/server/db src/server/logs
+RUN mkdir -p src/server/db/data src/server/logs
 
 # 初始化数据库
 RUN node src/server/db/initDb.js

@@ -12,7 +12,7 @@ if not exist "node_modules" (
 )
 
 REM 检查数据库文件是否存在
-if not exist "src\server\db\share_text.db" (
+if not exist "src\server\db\data\share_text.db" (
   echo 💾 初始化数据库...
   call npm run init-db
   echo.
