@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (data.success) {
         // 显示结果
         shareUrl.value = data.data.url;
-        expireInfo.textContent = `过期时间：${data.data.expireTimeFormatted}`;
+        expireInfo.textContent = `过期时间：${formatDateTime(data.data.expireTime)}`;
         result.classList.add('show');
         showToast('分享链接生成成功！', 'success');
       } else {
@@ -143,4 +143,20 @@ function showToast(message, type = 'success') {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+/**
+ * 格式化日期时间
+ */
+function formatDateTime(date) {
+  if (!date) return '永不过期';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '永不过期';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }

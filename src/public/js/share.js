@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
 
       // 显示过期时间
-      expireTimeEl.textContent = data.data.expireTimeFormatted || '永不过期';
+      expireTimeEl.textContent = formatDateTime(data.data.expireTime);
 
       // 设置复制功能
       copyBtn.addEventListener('click', function() {
@@ -67,12 +67,15 @@ document.addEventListener('DOMContentLoaded', async function() {
  * 格式化日期时间
  */
 function formatDateTime(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
+  if (!date) return '永不过期';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '永不过期';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
