@@ -1,6 +1,5 @@
 const shareTextModel = require('../models/shareText');
 const { generateId } = require('../utils/idGenerator');
-const { escapeHtml } = require('../utils/xssFilter');
 const { calculateExpireTime, formatDateTime } = require('../utils/dateUtil');
 const { validateContent, validateExpireType, validateCustomDays, validateShareId } = require('../utils/validator');
 const cache = require('../middleware/cache');
@@ -61,18 +60,15 @@ async function createShareText(req, res) {
       });
     }
 
-    // XSS转义处理
-    const escapedContent = escapeHtml(content);
-
     // 计算过期时间
     const expireTime = calculateExpireTime(expireType, expireDays);
 
     // 存入数据库
-    shareTextModel.createShareText(id, escapedContent, expireTime);
+    shareTextModel.createShareText(id, content, expireTime);
 
     // 存入缓存
     cache.setWithExpireTime(id, {
-      content: escapedContent,
+      content: content,
       expireTime: expireTime ? expireTime.toISOString() : null
     }, expireTime);
 

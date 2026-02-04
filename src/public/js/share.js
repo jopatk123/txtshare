@@ -28,9 +28,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       loadingEl.classList.remove('show');
       contentEl.style.display = 'block';
 
-      // 显示文本内容：后端已做 HTML 转义，这里用 innerHTML 让实体正确显示
-      const escapedContent = typeof data.data.content === 'string' ? data.data.content : '';
-      textContentEl.innerHTML = escapedContent;
+      // 显示文本内容：支持 Markdown 渲染
+      const rawContent = typeof data.data.content === 'string' ? data.data.content : '';
+      renderContent(textContentEl, rawContent);
 
       // 显示创建时间
       if (data.data.createTime) {
@@ -43,13 +43,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
       // 设置复制功能
       copyBtn.addEventListener('click', function() {
-        const decoded = decodeHtmlEntities(escapedContent);
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(decoded)
+          navigator.clipboard.writeText(rawContent)
             .then(() => showToast('内容已复制到剪贴板', 'success'))
-            .catch(() => fallbackCopy(decoded));
+            .catch(() => fallbackCopy(rawContent));
         } else {
-          fallbackCopy(decoded);
+          fallbackCopy(rawContent);
         }
       });
 
@@ -123,12 +122,24 @@ function showToast(message, type = 'success') {
 }
 
 /**
- * 将 HTML 实体反解为原始文本（用于复制）
+ * 渲染内容（Markdown 或纯文本）
  */
-function decodeHtmlEntities(escaped) {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = escaped;
-  return textarea.value;
+function renderContent(container, rawText) {
+  const text = typeof rawText === 'string' ? rawText : '';
+
+  if (isMarkdown(text) && window.marked && window.DOMPurify) {
+    const html = marked.parse(text, { breaks: true });
+    container.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  } else {
+    container.textContent = text;
+  }
+}
+
+/**
+ * 简单判断文本是否为 Markdown
+ */
+function isMarkdown(text) {
+  return /(^\s{0,3}#{1,6}\s)|(```)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(\[.+?\]\(.+?\))|(^\s*>\s)|(^\s*\|.+\|\s*$)/m.test(text);
 }
 
 /**

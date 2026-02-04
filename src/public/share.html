@@ -10,10 +10,6 @@
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <h1>📋 文本分享</h1>
-      <p>查看分享的文本内容</p>
-    </header>
 
     <!-- 加载状态 -->
     <div class="loading show" id="loading">
@@ -25,7 +21,7 @@
     <main class="card" id="content" style="display: none;">
       <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <label style="margin-bottom: 0;">分享内容</label>
+          <span></span>
           <button type="button" id="copyBtn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
             📋 复制内容
           </button>
@@ -54,6 +50,8 @@
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <script src="/js/share.js"></script>
 </body>
 </html>
