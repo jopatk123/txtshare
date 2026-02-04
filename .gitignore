@@ -11,3 +11,6 @@ data/
 .idea/
 *.swp
 *.swo
+
+# Ignore package lock files
+package-lock.json
