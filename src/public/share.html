@@ -6,7 +6,31 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查看分享 - TextShare</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/github-markdown.css">
+  <link rel="stylesheet" href="/css/github.min.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <style>
+    .markdown-body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 10px;
+      background-color: transparent !important;
+    }
+    .plain-text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #333;
+      padding: 20px;
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -26,7 +50,7 @@
             📋 复制内容
           </button>
         </div>
-        <div class="text-content" id="textContent"></div>
+        <div id="textContent" style="min-height: 100px;"></div>
       </div>
 
       <div class="meta-info">
@@ -52,6 +76,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="/js/share.js"></script>
 </body>
 </html>

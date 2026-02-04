@@ -128,9 +128,22 @@ function renderContent(container, rawText) {
   const text = typeof rawText === 'string' ? rawText : '';
 
   if (isMarkdown(text) && window.marked && window.DOMPurify) {
+    // 设置 Markdown 渲染容器样式
+    container.className = 'markdown-body';
+    
+    // 渲染 Markdown
     const html = marked.parse(text, { breaks: true });
     container.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    
+    // 代码高亮
+    if (window.hljs) {
+      container.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
   } else {
+    // 纯文本样式
+    container.className = 'plain-text';
     container.textContent = text;
   }
 }
