@@ -74,7 +74,7 @@ docker run -d \
   -p 6006:6006 \
   -v $(pwd)/data/db:/app/src/server/db/data \
   -v $(pwd)/data/logs:/app/src/server/logs \
-  -e BASE_URL=https://script.jopatk.top \
+  -e BASE_URL=https://txtshare.jopatk.top \
   text-share
 ```
 
@@ -85,16 +85,16 @@ docker run -d \
 ```nginx
 server {
     listen 80;
-    server_name script.jopatk.top;
+  server_name txtshare.jopatk.top;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name script.jopatk.top;
+  server_name txtshare.jopatk.top;
 
-    ssl_certificate /etc/letsencrypt/live/script.jopatk.top/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/script.jopatk.top/privkey.pem;
+  ssl_certificate /etc/letsencrypt/live/txtshare.jopatk.top/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/txtshare.jopatk.top/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:6006;

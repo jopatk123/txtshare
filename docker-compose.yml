@@ -13,4 +13,4 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=6006
-      - BASE_URL=https://script.jopatk.top
+      - BASE_URL=https://txtshare.jopatk.top

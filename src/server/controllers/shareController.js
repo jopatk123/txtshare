@@ -73,7 +73,7 @@ async function createShareText(req, res) {
     }, expireTime);
 
     // 构建分享链接
-    const baseUrl = process.env.BASE_URL || 'https://script.jopatk.top';
+    const baseUrl = process.env.BASE_URL || 'https://txtshare.jopatk.top';
     const shareUrl = `${baseUrl}/s/${id}`;
 
     logger.info(`Created share text: ${id}, expire: ${expireTime ? formatDateTime(expireTime) : 'never'}`);
