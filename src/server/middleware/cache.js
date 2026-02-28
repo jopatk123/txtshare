@@ -37,6 +37,8 @@ function set(key, value, ttl = 0) {
  */
 function setWithExpireTime(key, value, expireTime) {
   const ttl = calculateCacheTTL(expireTime);
+  // TTL < 0 表示已过期，不应缓存
+  if (ttl < 0) return;
   cache.set(key, value, ttl);
 }
 

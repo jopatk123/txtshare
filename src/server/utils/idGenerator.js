@@ -11,12 +11,10 @@ function generateId(length = 10) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const charsLength = chars.length;
   
-  // 生成随机字节
-  const randomBytes = crypto.randomBytes(length);
-  
   let result = '';
   for (let i = 0; i < length; i++) {
-    result += chars[randomBytes[i] % charsLength];
+    // 使用 crypto.randomInt 消除模偶偏差
+    result += chars[crypto.randomInt(charsLength)];
   }
   
   return result;

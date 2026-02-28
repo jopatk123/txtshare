@@ -63,13 +63,16 @@ async function createShareText(req, res) {
     // 计算过期时间
     const expireTime = calculateExpireTime(expireType, expireDays);
 
-    // 存入数据库
+    // 存入数据库（XSS 防护由前端 DOMPurify + textContent 处理，原始内容直接存储）
     shareTextModel.createShareText(id, content, expireTime);
 
-    // 存入缓存
+    // 存入缓存（包含完整字段，保持与数据库查询结果一致）
+    const now = new Date();
     cache.setWithExpireTime(id, {
       content: content,
-      expireTime: expireTime ? expireTime.toISOString() : null
+      expireTime: expireTime ? expireTime.toISOString() : null,
+      createTime: now.toISOString(),
+      viewCount: 0
     }, expireTime);
 
     // 构建分享链接
@@ -158,6 +161,12 @@ async function getShareText(req, res) {
 
     // 增加访问次数
     shareTextModel.incrementViewCount(id);
+
+    // 同步更新缓存中的 viewCount
+    if (textData.viewCount !== undefined) {
+      textData.viewCount = (textData.viewCount || 0) + 1;
+      cache.setWithExpireTime(id, textData, textData.expireTime);
+    }
 
     logger.info(`Accessed share text: ${id}`);
 

@@ -69,7 +69,7 @@ function calculateCacheTTL(expireTime) {
   const now = new Date();
   const ttl = Math.floor((expire.getTime() - now.getTime()) / 1000);
   
-  return ttl > 0 ? ttl : 0;
+  return ttl > 0 ? ttl : -1; // -1表示已过期，不应缓存
 }
 
 module.exports = {

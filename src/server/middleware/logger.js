@@ -19,6 +19,15 @@ const logFormat = winston.format.combine(
   })
 );
 
+// 定时任务日志过滤器：只记录定时任务相关日志
+const schedulerFilter = winston.format((info) => {
+  const msg = typeof info.message === 'string' ? info.message : '';
+  if (/cleanup|scheduler/i.test(msg)) {
+    return info;
+  }
+  return false;
+});
+
 // 创建logger实例
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -37,10 +46,14 @@ const logger = winston.createLogger({
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5
     }),
-    // 定时任务日志
+    // 定时任务日志（仅记录包含 cleanup/scheduler 关键词的日志）
     new winston.transports.File({
       filename: path.join(logDir, 'scheduler.log'),
       level: 'info',
+      format: winston.format.combine(
+        schedulerFilter(),
+        logFormat
+      ),
       maxsize: 5 * 1024 * 1024, // 5MB
       maxFiles: 3
     })

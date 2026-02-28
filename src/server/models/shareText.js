@@ -12,6 +12,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 let db = null;
+let _saveTimer = null;
 
 /**
  * 初始化数据库
@@ -37,7 +38,7 @@ async function initDatabase() {
 }
 
 /**
- * 保存数据库到文件
+ * 保存数据库到文件（立即保存，用于关键操作）
  */
 function saveDatabase() {
   if (db) {
@@ -45,6 +46,18 @@ function saveDatabase() {
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
   }
+}
+
+/**
+ * 延迟保存数据库到文件（用于非关键操作如 viewCount 更新，减少 I/O 压力）
+ * 多次调用会合并为一次写入，延迟 2 秒
+ */
+function saveDatabaseDebounced() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    saveDatabase();
+    _saveTimer = null;
+  }, 2000);
 }
 
 /**
@@ -98,7 +111,7 @@ function getShareTextById(id) {
  */
 function incrementViewCount(id) {
   db.run(`UPDATE share_text SET view_count = view_count + 1 WHERE id = ?`, [id]);
-  saveDatabase();
+  saveDatabaseDebounced(); // 访问计数是非关键操作，使用延迟保存
 }
 
 /**

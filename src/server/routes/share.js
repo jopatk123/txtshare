@@ -38,7 +38,9 @@ router.get('/:id', (req, res) => {
 
       textData = {
         content: record.content,
-        expireTime: record.expire_time
+        expireTime: record.expire_time,
+        createTime: record.create_time,
+        viewCount: record.view_count
       };
 
       // 存入缓存

@@ -12,6 +12,12 @@ if (!fs.existsSync(dataDir)) {
 }
 
 async function initDatabase() {
+  // 如果数据库文件已存在，跳过初始化以防止数据丢失
+  if (fs.existsSync(dbPath)) {
+    console.log('数据库文件已存在，跳过初始化:', dbPath);
+    return;
+  }
+
   const SQL = await initSqlJs();
   
   // 创建新数据库
