@@ -14,8 +14,8 @@ app.set('trust proxy', 1);
 
 // 中间件配置
 app.use(cors());
-app.use(express.json({ limit: '200kb' })); // 限制请求体大小
-app.use(express.urlencoded({ extended: true, limit: '200kb' }));
+app.use(express.json({ limit: '3mb' })); // 限制请求体大小（支持内嵌图片）
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
 // 请求日志
 app.use((req, res, next) => {

@@ -2,8 +2,8 @@
  * 参数校验工具
  */
 
-// 文本最大长度限制：100KB（约10万字符）
-const MAX_TEXT_LENGTH = 100 * 1024;
+// 文本最大长度限制：2MB（支持内嵌 base64 图片）
+const MAX_TEXT_LENGTH = 2 * 1024 * 1024;
 
 // 允许的过期类型
 const VALID_EXPIRE_TYPES = ['never', '1h', '1d', '7d', '30d', 'custom'];
@@ -31,7 +31,7 @@ function validateContent(content) {
   if (content.length > MAX_TEXT_LENGTH) {
     return {
       valid: false,
-      error: '文本过长，请删减后重试（最大100KB）'
+      error: '内容过大，请删减后重试（最大2MB）'
     };
   }
 

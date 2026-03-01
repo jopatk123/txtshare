@@ -74,8 +74,24 @@ function renderContent(container, rawText) {
     
     // 渲染 Markdown
     const html = marked.parse(text, { breaks: true });
-    container.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    // 配置 DOMPurify 允许 data: URL 的图片
+    container.innerHTML = DOMPurify.sanitize(html, {
+      USE_PROFILES: { html: true },
+      ADD_DATA_URI_TAGS: ['img'],
+      ADD_ATTR: ['src', 'alt'],
+    });
     
+    // 为内嵌图片添加响应式样式
+    container.querySelectorAll('img').forEach((img) => {
+      img.classList.add('shared-image');
+      // 点击图片放大查看
+      img.addEventListener('click', function() {
+        openImageViewer(this.src);
+      });
+      img.style.cursor = 'pointer';
+      img.title = '点击查看大图';
+    });
+
     // 代码高亮
     if (window.hljs) {
       container.querySelectorAll('pre code').forEach((block) => {
@@ -90,10 +106,43 @@ function renderContent(container, rawText) {
 }
 
 /**
- * 简单判断文本是否为 Markdown
+ * 图片查看器
+ */
+function openImageViewer(src) {
+  // 创建遮罩层
+  const overlay = document.createElement('div');
+  overlay.className = 'image-viewer-overlay';
+  
+  const img = document.createElement('img');
+  img.src = src;
+  img.className = 'image-viewer-img';
+  
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+
+  // 点击遮罩关闭
+  overlay.addEventListener('click', function() {
+    overlay.remove();
+  });
+
+  // ESC 键关闭
+  function handleEsc(e) {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', handleEsc);
+    }
+  }
+  document.addEventListener('keydown', handleEsc);
+
+  // 渐入动画
+  requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+/**
+ * 简单判断文本是否为 Markdown（包含图片标记检测）
  */
 function isMarkdown(text) {
-  return /(^\s{0,3}#{1,6}\s)|(```)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(\[.+?\]\(.+?\))|(^\s*>\s)|(^\s*\|.+\|\s*$)/m.test(text);
+  return /(^\s{0,3}#{1,6}\s)|(```)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(\[.+?\]\(.+?\))|(^\s*>\s)|(^\s*\|.+\|\s*$)|(!\[.*?\]\(data:image\/)/m.test(text);
 }
 
 /**
