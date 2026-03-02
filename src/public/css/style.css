@@ -98,6 +98,94 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
 }
 
+/* 富文本编辑器（contenteditable） */
+.rich-editor {
+  width: 100%;
+  min-height: 200px;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-y: auto;
+  transition: var(--transition);
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  outline: none;
+}
+
+.rich-editor:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.1);
+}
+
+/* 占位符 */
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* 编辑器内嵌图片 */
+.editor-inline-image {
+  display: block;
+  max-width: 100%;
+  max-height: 300px;
+  height: auto;
+  border-radius: var(--radius);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 图片 wrapper */
+.editor-img-wrapper {
+  display: inline-block;
+  position: relative;
+  margin: 6px 0;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+  line-height: 0;
+  cursor: default;
+}
+
+.editor-img-wrapper:hover {
+  border-color: var(--error-color);
+}
+
+/* 图片删除按鈕 */
+.editor-img-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 77, 79, 0.85);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1;
+  padding: 0;
+}
+
+.editor-img-wrapper:hover .editor-img-remove {
+  opacity: 1;
+}
+
+.editor-img-remove:hover {
+  background: var(--error-color);
+}
+
 textarea::placeholder {
   color: var(--text-muted);
 }
@@ -392,6 +480,10 @@ input[type="number"]:focus {
     min-height: 150px;
   }
 
+  .rich-editor {
+    min-height: 150px;
+  }
+
   .result-link {
     flex-direction: column;
   }
@@ -435,7 +527,8 @@ input[type="number"]:focus {
 }
 
 /* 拖拽高亮 */
-textarea.drag-over {
+textarea.drag-over,
+.rich-editor.drag-over {
   border-color: var(--primary-color) !important;
   background: rgba(74, 144, 217, 0.05);
   box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.15);

@@ -20,12 +20,13 @@
       <form id="shareForm">
         <div class="form-group">
           <label for="textContent">文本内容</label>
-          <textarea 
-            id="textContent" 
-            name="content" 
-            placeholder="在此粘贴或输入要分享的文本内容，支持直接粘贴图片..."
-            required
-          ></textarea>
+          <div
+            id="textContent"
+            class="rich-editor"
+            contenteditable="true"
+            data-placeholder="在此粘贴或输入要分享的文本内容，支持直接粘贴图片..."
+            spellcheck="false"
+          ></div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
             <div id="imageHint" class="image-hint">
               📷 支持 Ctrl+V 粘贴图片或拖拽图片到输入框
@@ -38,8 +39,7 @@
           <div id="imageProgress" class="image-progress" style="display: none;">
             <div class="image-progress-text"></div>
           </div>
-          <!-- 图片预览区域 -->
-          <div id="imagePreview" class="image-preview-area"></div>
+
         </div>
 
         <div class="form-group">

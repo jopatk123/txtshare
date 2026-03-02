@@ -4,7 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('shareForm');
-  const textContent = document.getElementById('textContent');
+  const editor = document.getElementById('textContent');
   const expireType = document.getElementById('expireType');
   const customDaysWrapper = document.getElementById('customDaysWrapper');
   const customDays = document.getElementById('customDays');
@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const copyBtn = document.getElementById('copyBtn');
   const expireInfo = document.getElementById('expireInfo');
   const imageProgress = document.getElementById('imageProgress');
-  const imagePreview = document.getElementById('imagePreview');
 
   // 内容最大限制（2MB，含图片 base64）
   const MAX_CONTENT_KB = 2048;
@@ -23,7 +22,47 @@ document.addEventListener('DOMContentLoaded', function() {
   // 已插入的图片计数
   let imageCount = 0;
 
-  // 监听过期类型变化
+  // ======== 将 contenteditable 内容序列化为纯文本/Markdown ========
+  function getEditorContent() {
+    const parts = [];
+
+    function serialize(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        parts.push(node.textContent);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = node.tagName.toUpperCase();
+        // editor-img-wrapper: <div contenteditable=false> 包裹的图片
+        if (tag === 'DIV' && node.classList.contains('editor-img-wrapper')) {
+          const imgEl = node.querySelector('img');
+          if (imgEl) {
+            const alt = imgEl.alt || `image-${imgEl.dataset.index || ''}`;
+            if (parts.length > 0 && parts[parts.length - 1] !== '\n') parts.push('\n');
+            parts.push(`![${alt}](${imgEl.src})`);
+            parts.push('\n');
+          }
+        } else if (tag === 'IMG') {
+          const alt = node.alt || `image-${node.dataset.index || ''}`;
+          if (parts.length > 0 && parts[parts.length - 1] !== '\n') parts.push('\n');
+          parts.push(`![${alt}](${node.src})`);
+          parts.push('\n');
+        } else if (tag === 'BR') {
+          parts.push('\n');
+        } else if (tag === 'DIV' || tag === 'P') {
+          // 块级元素：内容前确保有换行（首个块除外）
+          if (parts.length > 0 && parts[parts.length - 1] !== '\n') parts.push('\n');
+          Array.from(node.childNodes).forEach(serialize);
+          if (parts.length > 0 && parts[parts.length - 1] !== '\n') parts.push('\n');
+        } else {
+          Array.from(node.childNodes).forEach(serialize);
+        }
+      }
+    }
+
+    Array.from(editor.childNodes).forEach(serialize);
+    return parts.join('').trim();
+  }
+
+  // ======== 监听过期类型变化 ========
   expireType.addEventListener('change', function() {
     if (this.value === 'custom') {
       customDaysWrapper.classList.add('show');
@@ -33,27 +72,27 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ======== 图片粘贴处理 ========
-  textContent.addEventListener('paste', async function(e) {
+  editor.addEventListener('paste', async function(e) {
     const imageFile = ImageCompressor.getImageFromClipboard(e);
-    if (!imageFile) return; // 非图片粘贴，走默认行为
+    if (!imageFile) return; // 非图片，走默认行为（允许粘贴文本）
 
     e.preventDefault();
     await handleImageInsert(imageFile);
   });
 
   // ======== 图片拖拽处理 ========
-  textContent.addEventListener('dragover', function(e) {
+  editor.addEventListener('dragover', function(e) {
     e.preventDefault();
-    textContent.classList.add('drag-over');
+    editor.classList.add('drag-over');
   });
 
-  textContent.addEventListener('dragleave', function(e) {
+  editor.addEventListener('dragleave', function(e) {
     e.preventDefault();
-    textContent.classList.remove('drag-over');
+    editor.classList.remove('drag-over');
   });
 
-  textContent.addEventListener('drop', async function(e) {
-    textContent.classList.remove('drag-over');
+  editor.addEventListener('drop', async function(e) {
+    editor.classList.remove('drag-over');
     const imageFile = ImageCompressor.getImageFromDrop(e);
     if (!imageFile) return;
 
@@ -65,26 +104,19 @@ document.addEventListener('DOMContentLoaded', function() {
    * 处理图片插入（粘贴或拖拽）
    */
   async function handleImageInsert(imageFile) {
-    // 显示进度
     showImageProgress('正在处理图片...');
     submitBtn.disabled = true;
+
+    // 记录处理前的选区，以便后续在正确位置插入
+    const savedRange = saveCursorRange();
 
     try {
       const { dataUrl, info } = await ImageCompressor.compress(imageFile, function(msg) {
         showImageProgress(msg);
       });
 
-      // 生成 Markdown 图片标记
       imageCount++;
-      const markdownImg = `![image-${imageCount}](${dataUrl})`;
-
-      // 在光标位置插入
-      insertAtCursor(textContent, markdownImg);
-
-      // 添加图片预览缩略图
-      addImagePreview(dataUrl, info, imageCount);
-
-      // 更新字符计数
+      insertImageAtCaret(dataUrl, imageCount, savedRange);
       updateCharCounter();
 
       showToast(`图片已插入 (${ImageCompressor.formatSize(info.compressedSize)})`, 'success');
@@ -98,71 +130,90 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   /**
-   * 在光标位置插入文本
+   * 保存当前光标/选区范围
    */
-  function insertAtCursor(textarea, text) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = textarea.value.substring(0, start);
-    const after = textarea.value.substring(end);
-
-    // 确保图片标记前后有换行
-    const prefix = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
-    const suffix = after.length > 0 && !after.startsWith('\n') ? '\n' : '';
-
-    textarea.value = before + prefix + text + suffix + after;
-    
-    // 移动光标到插入内容后
-    const newPos = (before + prefix + text + suffix).length;
-    textarea.selectionStart = newPos;
-    textarea.selectionEnd = newPos;
-    textarea.focus();
+  function saveCursorRange() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      return sel.getRangeAt(0).cloneRange();
+    }
+    return null;
   }
 
   /**
-   * 添加图片预览缩略图
+   * 在指定范围（或末尾）插入图片元素
    */
-  function addImagePreview(dataUrl, info, index) {
-    imagePreview.style.display = 'flex';
-
-    const item = document.createElement('div');
-    item.className = 'image-preview-item';
-    item.dataset.index = index;
+  function insertImageAtCaret(dataUrl, index, savedRange) {
+    // 构建图片 wrapper（contenteditable=false 防止光标进入内部）
+    const wrapper = document.createElement('div');
+    wrapper.contentEditable = 'false';
+    wrapper.className = 'editor-img-wrapper';
 
     const img = document.createElement('img');
     img.src = dataUrl;
     img.alt = `image-${index}`;
+    img.dataset.index = index;
+    img.className = 'editor-inline-image';
 
-    const overlay = document.createElement('div');
-    overlay.className = 'image-preview-overlay';
-    overlay.innerHTML = `
-      <span class="image-preview-size">${ImageCompressor.formatSize(info.compressedSize)}</span>
-      <button type="button" class="image-preview-remove" title="移除图片">&times;</button>
-    `;
-
-    // 移除图片
-    overlay.querySelector('.image-preview-remove').addEventListener('click', function() {
-      // 从 textarea 中移除对应的 markdown 图片标记
-      const pattern = `![image-${index}]`;
-      const content = textContent.value;
-      // 找到完整的 ![image-N](data:...) 并移除
-      const regex = new RegExp(`\\n?!\\[image-${index}\\]\\([^)]+\\)\\n?`, 'g');
-      textContent.value = content.replace(regex, '\n').replace(/^\n+|\n+$/g, '');
-      
-      item.remove();
-      updateCharCounter();
-
-      // 如果没有图片了，隐藏预览区
-      if (imagePreview.children.length === 0) {
-        imagePreview.style.display = 'none';
-      }
-
-      showToast('图片已移除', 'success');
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'editor-img-remove';
+    removeBtn.title = '移除图片';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      removeEditorImage(wrapper, index);
     });
 
-    item.appendChild(img);
-    item.appendChild(overlay);
-    imagePreview.appendChild(item);
+    wrapper.appendChild(img);
+    wrapper.appendChild(removeBtn);
+
+    editor.focus();
+    const sel = window.getSelection();
+
+    let range;
+    if (savedRange) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      range = savedRange;
+    } else if (sel && sel.rangeCount > 0) {
+      range = sel.getRangeAt(0);
+    }
+
+    if (range && editor.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+
+      const frag = document.createDocumentFragment();
+      frag.appendChild(document.createElement('br'));
+      frag.appendChild(wrapper);
+      const afterBr = document.createElement('br');
+      frag.appendChild(afterBr);
+
+      range.insertNode(frag);
+
+      const newRange = document.createRange();
+      newRange.setStartAfter(afterBr);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } else {
+      editor.appendChild(document.createElement('br'));
+      editor.appendChild(wrapper);
+      editor.appendChild(document.createElement('br'));
+    }
+  }
+
+  /**
+   * 从编辑器中移除图片 wrapper
+   */
+  function removeEditorImage(wrapperEl, index) {
+    const prev = wrapperEl.previousSibling;
+    const next = wrapperEl.nextSibling;
+    if (prev && prev.nodeName === 'BR') prev.remove();
+    if (next && next.nodeName === 'BR') next.remove();
+    wrapperEl.remove();
+    updateCharCounter();
+    showToast('图片已移除', 'success');
   }
 
   /**
@@ -180,11 +231,11 @@ document.addEventListener('DOMContentLoaded', function() {
     imageProgress.style.display = 'none';
   }
 
-  // 表单提交
+  // ======== 表单提交 ========
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const content = textContent.value.trim();
+    const content = getEditorContent();
     if (!content) {
       showToast('请输入要分享的文本内容', 'error');
       return;
@@ -208,16 +259,13 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    // 禁用按钮，显示加载状态
     submitBtn.disabled = true;
     submitBtn.textContent = '生成中...';
 
     try {
       const response = await fetch('/api/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: content,
           expireType: expireTypeValue,
@@ -228,7 +276,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const data = await response.json();
 
       if (data.success) {
-        // 显示结果
         shareUrl.value = data.data.url;
         expireInfo.textContent = `过期时间：${formatDateTime(data.data.expireTime)}`;
         result.classList.add('show');
@@ -245,10 +292,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // 复制链接
+  // ======== 复制链接 ========
   copyBtn.addEventListener('click', function() {
     shareUrl.select();
-    
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl.value)
         .then(() => showToast('链接已复制到剪贴板', 'success'))
@@ -262,21 +309,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // 字符/大小计数
+  // ======== 字符/大小计数 ========
   function updateCharCounter() {
-    const content = textContent.value;
+    const content = getEditorContent();
     const sizeKB = new Blob([content]).size / 1024;
     const counter = document.getElementById('charCounter');
     if (counter) {
       counter.textContent = `${sizeKB.toFixed(1)} / ${MAX_CONTENT_KB.toLocaleString()} KB`;
-      if (sizeKB > MAX_CONTENT_KB) {
-        counter.style.color = 'var(--error-color)';
-      } else {
-        counter.style.color = 'var(--text-muted)';
-      }
+      counter.style.color = sizeKB > MAX_CONTENT_KB ? 'var(--error-color)' : 'var(--text-muted)';
     }
   }
 
-  textContent.addEventListener('input', updateCharCounter);
+  editor.addEventListener('input', updateCharCounter);
 });
 
