@@ -4,6 +4,7 @@ const path = require('path');
 
 const apiRoutes = require('./routes/api');
 const shareRoutes = require('./routes/share');
+const adminRoutes = require('./routes/admin');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const logger = require('./middleware/logger');
 
@@ -36,12 +37,20 @@ app.use(express.static(path.join(__dirname, '../public')));
 // API路由
 app.use('/api', apiRoutes);
 
+// 管理员API路由
+app.use('/api/admin', adminRoutes);
+
 // 分享页面路由
 app.use('/s', shareRoutes);
 
 // 主页
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// 管理员页面（/admin 重定向到 /admin/）
+app.get('/admin', (req, res) => {
+  res.redirect('/admin/');
 });
 
 // 404处理

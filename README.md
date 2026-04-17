@@ -80,6 +80,8 @@ docker run -d \
 
 `BASE_URL` 是可选项。若不设置，服务端会根据当前请求的协议和主机名自动生成分享链接。
 
+如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL` 和 `ADMIN_TOKEN`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
+
 ## Nginx 配置
 
 在宿主机配置 Nginx 反向代理：

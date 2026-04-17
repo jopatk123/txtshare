@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const schedule = require('node-schedule');
 const shareTextModel = require('./models/shareText');
 const cache = require('./middleware/cache');

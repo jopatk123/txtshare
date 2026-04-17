@@ -119,12 +119,14 @@ function incrementViewCount(id) {
  * @returns {number} - 删除的记录数
  */
 function deleteExpiredRecords() {
-  const result = db.run(`
+  db.run(`
     DELETE FROM share_text
     WHERE expire_time IS NOT NULL AND expire_time < datetime('now')
   `);
+  // 必须在 saveDatabase()（即 db.export()）之前读取，否则会被重置为 0
+  const affected = db.getRowsModified();
   saveDatabase();
-  return db.getRowsModified();
+  return affected;
 }
 
 /**
@@ -157,6 +159,110 @@ function isExpired(record) {
   return new Date(record.expire_time) < new Date();
 }
 
+/**
+ * 获取所有分享文本（分页，内容截断用于预览）
+ * @param {Object} options - { page, limit, search }
+ * @returns {{ total: number, rows: Object[] }}
+ */
+function getAllShareTexts({ page = 1, limit = 20, search = '' } = {}) {
+  const offset = (page - 1) * limit;
+  const params = [];
+  let whereClause = '';
+
+  if (search && search.trim()) {
+    whereClause = ' WHERE id LIKE ?';
+    params.push(`%${search.trim()}%`);
+  }
+
+  const countStmt = db.prepare(`SELECT COUNT(*) as total FROM share_text${whereClause}`);
+  if (params.length > 0) countStmt.bind(params);
+  let total = 0;
+  if (countStmt.step()) {
+    total = countStmt.getAsObject().total;
+  }
+  countStmt.free();
+
+  const dataStmt = db.prepare(
+    `SELECT id, substr(content, 1, 120) as content_preview, create_time, expire_time, view_count
+     FROM share_text${whereClause}
+     ORDER BY create_time DESC LIMIT ? OFFSET ?`
+  );
+  dataStmt.bind([...params, limit, offset]);
+
+  const rows = [];
+  while (dataStmt.step()) {
+    rows.push(dataStmt.getAsObject());
+  }
+  dataStmt.free();
+
+  return { total, rows };
+}
+
+/**
+ * 根据ID删除单条记录
+ * @param {string} id - 分享ID
+ * @returns {boolean} - 是否删除成功
+ */
+function deleteShareTextById(id) {
+  db.run('DELETE FROM share_text WHERE id = ?', [id]);
+  const affected = db.getRowsModified();
+  if (affected > 0) saveDatabase();
+  return affected > 0;
+}
+
+/**
+ * 批量删除记录
+ * @param {string[]} ids - 分享ID数组
+ * @returns {number} - 删除的记录数
+ */
+function deleteShareTextsByIds(ids) {
+  if (!ids || ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  db.run(`DELETE FROM share_text WHERE id IN (${placeholders})`, ids);
+  const affected = db.getRowsModified();
+  if (affected > 0) saveDatabase();
+  return affected;
+}
+
+/**
+ * 获取数据库统计信息
+ * @returns {{ total: number, totalViews: number, expired: number, neverExpire: number }}
+ */
+function getStats() {
+  const totalStmt = db.prepare(
+    'SELECT COUNT(*) as total, COALESCE(SUM(view_count), 0) as total_views FROM share_text'
+  );
+  let total = 0;
+  let totalViews = 0;
+  if (totalStmt.step()) {
+    const row = totalStmt.getAsObject();
+    total = row.total;
+    totalViews = row.total_views;
+  }
+  totalStmt.free();
+
+  const expiredStmt = db.prepare(
+    `SELECT COUNT(*) as expired FROM share_text
+     WHERE expire_time IS NOT NULL AND expire_time < datetime('now')`
+  );
+  let expired = 0;
+  if (expiredStmt.step()) {
+    expired = expiredStmt.getAsObject().expired;
+  }
+  expiredStmt.free();
+
+  const neverExpireStmt = db.prepare(
+    'SELECT COUNT(*) as never_expire FROM share_text WHERE expire_time IS NULL'
+  );
+  let neverExpire = 0;
+  if (neverExpireStmt.step()) {
+    neverExpire = neverExpireStmt.getAsObject().never_expire;
+  }
+  neverExpireStmt.free();
+
+  return { total, totalViews, expired, neverExpire };
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -165,5 +271,9 @@ module.exports = {
   incrementViewCount,
   deleteExpiredRecords,
   getExpiredIds,
-  isExpired
+  isExpired,
+  getAllShareTexts,
+  deleteShareTextById,
+  deleteShareTextsByIds,
+  getStats
 };
