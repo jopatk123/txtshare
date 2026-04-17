@@ -13,4 +13,5 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=6006
-      - BASE_URL=https://txtshare.jopatk.top
+      # 可选：设置对外访问的完整地址，例如 https://your-domain.example
+      - BASE_URL=${BASE_URL:-}

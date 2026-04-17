@@ -74,9 +74,11 @@ docker run -d \
   -p 6006:6006 \
   -v $(pwd)/data/db:/app/src/server/db/data \
   -v $(pwd)/data/logs:/app/src/server/logs \
-  -e BASE_URL=https://txtshare.jopatk.top \
+  -e BASE_URL=https://your-domain.example \
   text-share
 ```
+
+`BASE_URL` 是可选项。若不设置，服务端会根据当前请求的协议和主机名自动生成分享链接。
 
 ## Nginx 配置
 
@@ -85,16 +87,16 @@ docker run -d \
 ```nginx
 server {
     listen 80;
-  server_name txtshare.jopatk.top;
+    server_name your-domain.example;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-  server_name txtshare.jopatk.top;
+    server_name your-domain.example;
 
-  ssl_certificate /etc/letsencrypt/live/txtshare.jopatk.top/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/txtshare.jopatk.top/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/your-domain.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.example/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:6006;

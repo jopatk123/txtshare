@@ -2,6 +2,7 @@ const shareTextModel = require('../models/shareText');
 const { generateId } = require('../utils/idGenerator');
 const { calculateExpireTime, formatDateTime } = require('../utils/dateUtil');
 const { validateContent, validateExpireType, validateCustomDays, validateShareId } = require('../utils/validator');
+const { getRequestBaseUrl } = require('../utils/baseUrl');
 const cache = require('../middleware/cache');
 const logger = require('../middleware/logger');
 
@@ -76,8 +77,7 @@ async function createShareText(req, res) {
     }, expireTime);
 
     // 构建分享链接
-    const baseUrl = process.env.BASE_URL || 'https://txtshare.jopatk.top';
-    const shareUrl = `${baseUrl}/s/${id}`;
+    const shareUrl = `${getRequestBaseUrl(req)}/s/${id}`;
 
     logger.info(`Created share text: ${id}, expire: ${expireTime ? formatDateTime(expireTime) : 'never'}`);
 
