@@ -70,7 +70,7 @@ function renderContent(container, rawText) {
 
   if (isMarkdown(text) && window.marked && window.DOMPurify) {
     // 设置 Markdown 渲染容器样式
-    container.className = 'markdown-body';
+    container.className = 'markdown-body markdown-share-body';
     
     // 渲染 Markdown
     const html = marked.parse(text, { breaks: true });
@@ -84,11 +84,13 @@ function renderContent(container, rawText) {
     // 为内嵌图片添加响应式样式
     container.querySelectorAll('img').forEach((img) => {
       img.classList.add('shared-image');
+      img.loading = 'lazy';
+      img.decoding = 'async';
       // 点击图片放大查看
       img.addEventListener('click', function() {
         openImageViewer(this.src);
       });
-      img.style.cursor = 'pointer';
+      img.style.cursor = 'zoom-in';
       img.title = '点击查看大图';
     });
 
