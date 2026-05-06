@@ -5,7 +5,6 @@ const path = require('path');
 const apiRoutes = require('./routes/api');
 const shareRoutes = require('./routes/share');
 const adminRoutes = require('./routes/admin');
-const { apiLimiter } = require('./middleware/rateLimiter');
 const logger = require('./middleware/logger');
 const { getTrustProxySetting } = require('./utils/trustProxy');
 
@@ -29,9 +28,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// API限流
-app.use('/api', apiLimiter);
-
 // 静态文件
 app.use(express.static(path.join(__dirname, '../public')));
 
@@ -54,13 +50,18 @@ app.get('/admin', (req, res) => {
   res.redirect('/admin/');
 });
 
-// 404处理
+// API 路由 404：返回 JSON 而非 HTML
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, error: '接口不存在' });
+});
+
+// 通用 404
 app.use((req, res) => {
   res.status(404).sendFile(path.join(__dirname, '../public/expired.html'));
 });
 
 // 错误处理
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({
     success: false,

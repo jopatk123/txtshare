@@ -7,7 +7,9 @@
     "start": "node src/server/index.js",
     "dev": "nodemon src/server/index.js",
     "init-db": "node src/server/db/initDb.js",
-    "test": "jest --testPathPatterns=tests/"
+    "test": "jest --testPathPatterns=tests/",
+    "lint": "eslint src/server/ tests/",
+    "lint:fix": "eslint src/server/ tests/ --fix"
   },
   "keywords": [
     "text-share",
@@ -27,6 +29,9 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
     "jest": "^30.3.0",
     "nodemon": "^3.0.2",
     "supertest": "^7.2.2"

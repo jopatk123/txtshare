@@ -21,14 +21,14 @@ function validateContent(content) {
     };
   }
 
-  if (content.trim().length === 0) {
+  if (content.length === 0 || content.trim().length === 0) {
     return {
       valid: false,
       error: '文本内容不能为空'
     };
   }
 
-  if (content.length > MAX_TEXT_LENGTH) {
+  if (Buffer.byteLength(content, 'utf8') > MAX_TEXT_LENGTH) {
     return {
       valid: false,
       error: '内容过大，请删减后重试（最大2MB）'
