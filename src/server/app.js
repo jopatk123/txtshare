@@ -7,11 +7,12 @@ const shareRoutes = require('./routes/share');
 const adminRoutes = require('./routes/admin');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const logger = require('./middleware/logger');
+const { getTrustProxySetting } = require('./utils/trustProxy');
 
 const app = express();
 
-// 信任代理（用于获取真实IP）
-app.set('trust proxy', 1);
+// 默认不信任转发头，部署在反向代理后时通过 TRUST_PROXY 显式开启。
+app.set('trust proxy', getTrustProxySetting());
 
 // 中间件配置
 app.use(cors());

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # 开发服务器启动脚本
 
 echo "🚀 启动 TextShare 开发服务器..."

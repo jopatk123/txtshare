@@ -15,5 +15,7 @@ services:
       - PORT=6006
       # 可选：设置对外访问的完整地址，例如 https://your-domain.example
       - BASE_URL=${BASE_URL:-}
+      # 默认不信任转发头；仅在前面有一层受信任反向代理时设置为 1 或对应策略
+      - TRUST_PROXY=${TRUST_PROXY:-false}
       # 管理员令牌（必须设置才能启用 /admin/ 后台）
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}

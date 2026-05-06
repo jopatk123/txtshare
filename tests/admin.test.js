@@ -98,6 +98,17 @@ describe('GET /api/admin/stats', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.expired).toBeGreaterThanOrEqual(1);
   });
+
+  test('同日内已过期的 ISO 时间也会计入 expired', async () => {
+    insertShare('testSameDayStat', '同日过期内容', new Date(Date.now() - 60 * 1000).toISOString());
+
+    const res = await request(app)
+      .get('/api/admin/stats')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.expired).toBeGreaterThanOrEqual(1);
+  });
 });
 
 // ── 列表接口 ────────────────────────────────────────────────────────────────
@@ -268,6 +279,18 @@ describe('POST /api/admin/cleanup', () => {
     expect(res.body.data.deleted).toBeGreaterThanOrEqual(2);
     // 永久记录不被删除
     expect(shareTextModel.getShareTextById('testC')).not.toBeNull();
+  });
+
+  test('同日内已过期的 ISO 时间会被清理', async () => {
+    insertShare('testSameDayCleanup', '同日过期', new Date(Date.now() - 60 * 1000).toISOString());
+
+    const res = await request(app)
+      .post('/api/admin/cleanup')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.deleted).toBeGreaterThanOrEqual(1);
+    expect(shareTextModel.getShareTextById('testSameDayCleanup')).toBeNull();
   });
 
   test('无过期记录时 deleted 为 0', async () => {

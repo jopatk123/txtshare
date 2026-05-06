@@ -13,6 +13,7 @@ if (!fs.existsSync(dataDir)) {
 
 let db = null;
 let _saveTimer = null;
+const EXPIRED_RECORDS_CONDITION = "expire_time IS NOT NULL AND datetime(expire_time) < datetime('now')";
 
 /**
  * 初始化数据库
@@ -58,6 +59,18 @@ function saveDatabaseDebounced() {
     saveDatabase();
     _saveTimer = null;
   }, 2000);
+}
+
+/**
+ * 立即写出所有待落盘的数据
+ */
+function flushPendingWrites() {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+
+  saveDatabase();
 }
 
 /**
@@ -121,7 +134,7 @@ function incrementViewCount(id) {
 function deleteExpiredRecords() {
   db.run(`
     DELETE FROM share_text
-    WHERE expire_time IS NOT NULL AND expire_time < datetime('now')
+    WHERE ${EXPIRED_RECORDS_CONDITION}
   `);
   // 必须在 saveDatabase()（即 db.export()）之前读取，否则会被重置为 0
   const affected = db.getRowsModified();
@@ -137,7 +150,7 @@ function getExpiredIds() {
   const results = [];
   const stmt = db.prepare(`
     SELECT id FROM share_text
-    WHERE expire_time IS NOT NULL AND expire_time < datetime('now')
+    WHERE ${EXPIRED_RECORDS_CONDITION}
   `);
   
   while (stmt.step()) {
@@ -243,7 +256,7 @@ function getStats() {
 
   const expiredStmt = db.prepare(
     `SELECT COUNT(*) as expired FROM share_text
-     WHERE expire_time IS NOT NULL AND expire_time < datetime('now')`
+      WHERE ${EXPIRED_RECORDS_CONDITION}`
   );
   let expired = 0;
   if (expiredStmt.step()) {
@@ -266,6 +279,7 @@ function getStats() {
 module.exports = {
   initDatabase,
   getDb,
+  flushPendingWrites,
   createShareText,
   getShareTextById,
   incrementViewCount,

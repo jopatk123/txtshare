@@ -25,11 +25,10 @@
 
 ```bash
 # macOS/Linux
-./dev.sh
-
-# Windows
-dev.bat
+./start.sh
 ```
+
+Windows 环境目前没有单独的快速启动脚本，请使用下方“手动启动”步骤。
 
 ### 手动启动
 
@@ -78,9 +77,11 @@ docker run -d \
   text-share
 ```
 
-`BASE_URL` 是可选项。若不设置，服务端会根据当前请求的协议和主机名自动生成分享链接。
+`BASE_URL` 是可选项，但生产环境建议显式设置。若不设置，服务端会根据当前请求动态生成分享链接。
 
-如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL` 和 `ADMIN_TOKEN`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
+`TRUST_PROXY` 默认应保持关闭。只有在应用前方存在你明确控制的反向代理时，才应开启；例如单层 Nginx 反向代理可设置为 `1`。
+
+如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY` 和 `ADMIN_TOKEN`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
 
 ## Nginx 配置
 

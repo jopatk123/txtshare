@@ -5,8 +5,10 @@ const shareTextModel = require('./models/shareText');
 const cache = require('./middleware/cache');
 const logger = require('./middleware/logger');
 const { getConfiguredBaseUrl } = require('./utils/baseUrl');
+const { createShutdownHandler } = require('./utils/gracefulShutdown');
 
 const PORT = process.env.PORT || 6006;
+let shutdown = null;
 
 // 初始化数据库后启动服务器
 async function startServer() {
@@ -47,29 +49,21 @@ async function startServer() {
       }
     });
 
+    shutdown = createShutdownHandler({
+      server,
+      cleanupJob,
+      logger,
+      flushPendingWrites: shareTextModel.flushPendingWrites,
+      exit: (code) => process.exit(code)
+    });
+
     // 优雅关闭
     process.on('SIGTERM', () => {
-      logger.info('SIGTERM received, shutting down gracefully...');
-      
-      // 取消定时任务
-      cleanupJob.cancel();
-      
-      server.close(() => {
-        logger.info('Server closed');
-        process.exit(0);
-      });
+      shutdown('SIGTERM', 0);
     });
 
     process.on('SIGINT', () => {
-      logger.info('SIGINT received, shutting down gracefully...');
-      
-      // 取消定时任务
-      cleanupJob.cancel();
-      
-      server.close(() => {
-        logger.info('Server closed');
-        process.exit(0);
-      });
+      shutdown('SIGINT', 0);
     });
 
   } catch (error) {
@@ -81,6 +75,11 @@ async function startServer() {
 // 未捕获异常处理
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
+  try {
+    shareTextModel.flushPendingWrites();
+  } catch (flushError) {
+    logger.error('Failed to flush pending writes after uncaught exception:', flushError);
+  }
   process.exit(1);
 });
 
