@@ -6,6 +6,9 @@
 const request = require('supertest');
 const shareTextModel = require('../src/server/models/shareText');
 const cache = require('../src/server/middleware/cache');
+const originalBaseUrl = process.env.BASE_URL;
+const originalNodeEnv = process.env.NODE_ENV;
+const originalPort = process.env.PORT;
 
 let app;
 beforeAll(async () => {
@@ -17,6 +20,12 @@ afterEach(() => {
   const db = shareTextModel.getDb();
   db.run("DELETE FROM share_text WHERE id LIKE 'test%'");
   cache.flush();
+  if (originalBaseUrl === undefined) delete process.env.BASE_URL;
+  else process.env.BASE_URL = originalBaseUrl;
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = originalNodeEnv;
+  if (originalPort === undefined) delete process.env.PORT;
+  else process.env.PORT = originalPort;
 });
 
 // ── POST /api/create ─────────────────────────────────────────────────────────
@@ -149,6 +158,20 @@ describe('POST /api/create', () => {
       .send({ content: 'url test', expireType: 'never' });
 
     expect(res.body.data.url).toMatch(/\/s\/[A-Za-z0-9]{8,16}$/);
+  });
+
+  test('生产环境未配置 BASE_URL 时回退到 localhost + PORT，而不是 undefined', async () => {
+    delete process.env.BASE_URL;
+    process.env.NODE_ENV = 'production';
+    process.env.PORT = '6006';
+
+    const res = await request(app)
+      .post('/api/create')
+      .set('Host', 'evil.example.com')
+      .send({ content: 'prod url fallback', expireType: 'never' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.url).toMatch(/^http:\/\/localhost:6006\/s\/[A-Za-z0-9]{8,16}$/);
   });
 });
 

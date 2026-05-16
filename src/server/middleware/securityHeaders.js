@@ -39,7 +39,7 @@ function securityHeaders() {
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     res.setHeader('Content-Security-Policy', cspHeader);
 
-    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    if (req.secure) {
       res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
     }
 

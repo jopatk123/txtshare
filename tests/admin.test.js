@@ -8,6 +8,9 @@ const shareTextModel = require('../src/server/models/shareText');
 const cache = require('../src/server/middleware/cache');
 
 const TEST_TOKEN = 'test-admin-token-12345';
+const originalBaseUrl = process.env.BASE_URL;
+const originalNodeEnv = process.env.NODE_ENV;
+const originalPort = process.env.PORT;
 
 // 必须在 require app 之前设置 ADMIN_TOKEN
 process.env.ADMIN_TOKEN = TEST_TOKEN;
@@ -23,7 +26,14 @@ afterEach(() => {
   // 每个测试后清理测试数据，避免状态污染
   const db = shareTextModel.getDb();
   db.run("DELETE FROM share_text WHERE id LIKE 'test%'");
+  db.run('DELETE FROM audit_log');
   cache.delMultiple(['testA', 'testB', 'testC']);
+  if (originalBaseUrl === undefined) delete process.env.BASE_URL;
+  else process.env.BASE_URL = originalBaseUrl;
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = originalNodeEnv;
+  if (originalPort === undefined) delete process.env.PORT;
+  else process.env.PORT = originalPort;
 });
 
 // ── 辅助：插入测试记录 ──────────────────────────────────────────────────────
@@ -143,6 +153,21 @@ describe('GET /api/admin/shares', () => {
     expect(row.isExpired).toBe(false);
   });
 
+  test('生产环境未配置 BASE_URL 时列表链接回退到 localhost + PORT', async () => {
+    delete process.env.BASE_URL;
+    process.env.NODE_ENV = 'production';
+    process.env.PORT = '6006';
+
+    insertShare('testA', 'Hello World');
+    const res = await request(app)
+      .get('/api/admin/shares?limit=50')
+      .set('Host', 'evil.example.com')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    const row = res.body.data.rows.find(r => r.id === 'testA');
+    expect(row.url).toBe('http://localhost:6006/s/testA');
+  });
+
   test('isExpired 正确标记已过期记录', async () => {
     const past = new Date(Date.now() - 1000).toISOString();
     insertShare('testB', '过期记录', past);
@@ -191,6 +216,10 @@ describe('DELETE /api/admin/shares/:id', () => {
     expect(res.body.success).toBe(true);
     // 确认已删除
     expect(shareTextModel.getShareTextById('testA')).toBeNull();
+
+    const [log] = shareTextModel.getAuditLogs({ limit: 1 });
+    expect(log.action).toBe('admin.deleteShare');
+    expect(log.target).toBe('testA');
   });
 
   test('删除不存在的记录返回 404', async () => {
@@ -225,6 +254,10 @@ describe('DELETE /api/admin/shares (batch)', () => {
     expect(res.body.data.deleted).toBe(2);
     expect(shareTextModel.getShareTextById('testA')).toBeNull();
     expect(shareTextModel.getShareTextById('testB')).toBeNull();
+
+    const [log] = shareTextModel.getAuditLogs({ limit: 1 });
+    expect(log.action).toBe('admin.deleteBatch');
+    expect(log.detail.deleted).toBe(2);
   });
 
   test('ids 为空数组返回 400', async () => {
@@ -279,6 +312,10 @@ describe('POST /api/admin/cleanup', () => {
     expect(res.body.data.deleted).toBeGreaterThanOrEqual(2);
     // 永久记录不被删除
     expect(shareTextModel.getShareTextById('testC')).not.toBeNull();
+
+    const [log] = shareTextModel.getAuditLogs({ limit: 1 });
+    expect(log.action).toBe('admin.cleanupExpired');
+    expect(log.detail.deleted).toBeGreaterThanOrEqual(2);
   });
 
   test('同日内已过期的 ISO 时间会被清理', async () => {
@@ -311,6 +348,8 @@ describe('GET /admin/', () => {
     const res = await request(app).get('/admin/');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/html/);
+    expect(res.text).not.toContain('sessionStorage');
+    expect(res.text).toContain('令牌仅保存在当前页面内存');
   });
 
   test('GET /admin 重定向到 /admin/', async () => {
@@ -318,5 +357,24 @@ describe('GET /admin/', () => {
     const res = await request(app).get('/admin');
     expect([301, 302]).toContain(res.status);
     expect(res.headers.location).toMatch(/\/admin\//);
+  });
+});
+
+describe('GET /api/admin/audit-logs', () => {
+  test('返回审计日志列表', async () => {
+    insertShare('testA', '审计内容');
+    await request(app)
+      .delete('/api/admin/shares/testA')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    const res = await request(app)
+      .get('/api/admin/audit-logs?limit=5')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.rows)).toBe(true);
+    expect(res.body.data.rows[0]).toHaveProperty('action');
+    expect(res.body.data.rows[0]).toHaveProperty('actorIp');
   });
 });

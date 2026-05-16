@@ -60,8 +60,8 @@ const logger = winston.createLogger({
   ]
 });
 
-// 非生产环境输出到控制台
-if (process.env.NODE_ENV !== 'production') {
+// 测试环境以外都输出到控制台，便于 docker logs / 进程管理器直接采集。
+if (process.env.NODE_ENV !== 'test') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),

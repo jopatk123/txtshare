@@ -36,6 +36,7 @@
     }
     .login-card h1 { font-size: 22px; margin-bottom: 8px; }
     .login-card p  { color: var(--text-secondary); margin-bottom: 28px; font-size: 14px; }
+    .login-card .note { color: var(--text-muted); margin: 10px 0 0; font-size: 12px; line-height: 1.5; }
     .login-card input {
       width: 100%; padding: 10px 14px; border: 1px solid var(--border);
       border-radius: var(--radius); font-size: 15px; outline: none;
@@ -111,6 +112,18 @@
     .table-wrap {
       background: var(--card); border-radius: var(--radius);
       box-shadow: var(--shadow); overflow: hidden;
+    }
+    .audit-wrap {
+      margin-top: 18px; background: var(--card); border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden;
+    }
+    .audit-wrap h2 {
+      padding: 16px 18px; font-size: 15px; border-bottom: 1px solid var(--border);
+    }
+    .audit-row td { font-size: 12px; color: var(--text-secondary); }
+    .audit-detail {
+      max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
@@ -199,6 +212,7 @@
     <p>TextShare 管理员登录</p>
     <input id="tokenInput" type="password" placeholder="输入管理员令牌" autocomplete="current-password" />
     <button id="loginBtn">登 录</button>
+    <p class="note">令牌仅保存在当前页面内存，刷新或关闭页面后需要重新登录。</p>
     <div id="loginError"></div>
   </div>
 </div>
@@ -254,6 +268,24 @@
         <div class="pagination-btns" id="pageBtns"></div>
       </div>
     </div>
+
+    <div class="audit-wrap">
+      <h2>最近审计日志</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>动作</th>
+            <th>目标</th>
+            <th>详情</th>
+            <th>来源 IP</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody">
+          <tr class="loading-row"><td colspan="5">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -275,7 +307,7 @@
 <script>
   // ── State ────────────────────────────────────────────────────────────────
   const state = {
-    token: sessionStorage.getItem('adminToken') || '',
+    token: '',
     page: 1,
     limit: 20,
     search: '',
@@ -297,6 +329,7 @@
   const searchInput  = $('searchInput');
   const pageInfo     = $('pageInfo');
   const pageBtns     = $('pageBtns');
+  const auditTableBody = $('auditTableBody');
   const toast        = $('toast');
   const confirmModal = $('confirmModal');
 
@@ -368,13 +401,11 @@
       return;
     }
 
-    sessionStorage.setItem('adminToken', token);
     showMain(data.data);
   }
 
   function logout() {
     state.token = '';
-    sessionStorage.removeItem('adminToken');
     adminApp.style.display = 'none';
     loginScreen.style.display = 'flex';
     tokenInput.value = '';
@@ -386,6 +417,7 @@
     adminApp.style.display = 'block';
     renderStats(statsData);
     loadShares();
+    loadAuditLogs();
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -400,6 +432,31 @@
   async function refreshStats() {
     const { ok, data } = await api('GET', '/stats');
     if (ok) renderStats(data.data);
+  }
+
+  async function loadAuditLogs() {
+    auditTableBody.innerHTML = '<tr class="loading-row"><td colspan="5">加载中…</td></tr>';
+    const { ok, status, data } = await api('GET', '/audit-logs?limit=10');
+    if (!ok) {
+      if (status === 401) { logout(); return; }
+      auditTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">加载失败：${data.error || '未知错误'}</td></tr>`;
+      return;
+    }
+
+    if (!data.data.rows.length) {
+      auditTableBody.innerHTML = '<tr class="empty-row"><td colspan="5">暂无审计记录</td></tr>';
+      return;
+    }
+
+    auditTableBody.innerHTML = data.data.rows.map(row => `
+      <tr class="audit-row">
+        <td class="time-cell">${formatTime(row.createdTime)}</td>
+        <td>${esc(row.action)}</td>
+        <td>${esc(row.target)}</td>
+        <td class="audit-detail" title="${esc(JSON.stringify(row.detail || {}))}">${esc(JSON.stringify(row.detail || {}))}</td>
+        <td>${esc(row.actorIp || '-')}</td>
+      </tr>
+    `).join('');
   }
 
   // ── List ──────────────────────────────────────────────────────────────────
@@ -542,6 +599,7 @@
       state.selected.delete(id);
       await loadShares();
       await refreshStats();
+      await loadAuditLogs();
     } else {
       showToast(res.data.error || '删除失败', 'error');
     }
@@ -558,6 +616,7 @@
       state.selected.clear();
       await loadShares();
       await refreshStats();
+      await loadAuditLogs();
     } else {
       showToast(res.data.error || '批量删除失败', 'error');
     }
@@ -573,6 +632,7 @@
       showToast(`已清理 ${res.data.data.deleted} 条过期记录`, 'success');
       await loadShares();
       await refreshStats();
+      await loadAuditLogs();
     } else {
       showToast(res.data.error || '清理失败', 'error');
     }
@@ -589,7 +649,7 @@
   });
 
   // ── Misc ──────────────────────────────────────────────────────────────────
-  $('refreshBtn').addEventListener('click', () => { loadShares(); refreshStats(); });
+  $('refreshBtn').addEventListener('click', () => { loadShares(); refreshStats(); loadAuditLogs(); });
   $('logoutBtn').addEventListener('click', logout);
   loginBtn.addEventListener('click', tryLogin);
   tokenInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
@@ -598,15 +658,7 @@
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  (async () => {
-    if (state.token) {
-      const { ok, data } = await api('GET', '/stats').catch(() => ({ ok: false, data: {} }));
-      if (ok) { showMain(data.data); return; }
-      state.token = '';
-      sessionStorage.removeItem('adminToken');
-    }
-    loginScreen.style.display = 'flex';
-  })();
+  loginScreen.style.display = 'flex';
 </script>
 </body>
 </html>

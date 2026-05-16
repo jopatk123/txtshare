@@ -14,6 +14,17 @@ if (!fs.existsSync(dataDir)) {
 let db = null;
 let _saveTimer = null;
 const EXPIRED_RECORDS_CONDITION = "expire_time IS NOT NULL AND datetime(expire_time) < datetime('now')";
+const AUDIT_LOG_INIT_SQL = `
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    target TEXT NOT NULL,
+    detail TEXT,
+    actor_ip TEXT,
+    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_log_created_time ON audit_log(created_time DESC);
+`;
 
 /**
  * 初始化数据库
@@ -32,8 +43,10 @@ async function initDatabase() {
     // 执行初始化SQL
     const initSql = fs.readFileSync(path.join(dbDir, 'init.sql'), 'utf8');
     db.run(initSql);
-    saveDatabase();
   }
+
+  db.run(AUDIT_LOG_INIT_SQL);
+  saveDatabase();
   
   return db;
 }
@@ -291,6 +304,55 @@ function getStats() {
   return { total, totalViews, expired, neverExpire };
 }
 
+function createAuditLog({ action, target, detail = null, actorIp = null }) {
+  const stmt = db.prepare(`
+    INSERT INTO audit_log (action, target, detail, actor_ip)
+    VALUES (?, ?, ?, ?)
+  `);
+  stmt.run([
+    action,
+    target,
+    detail == null ? null : JSON.stringify(detail),
+    actorIp
+  ]);
+  stmt.free();
+  saveDatabase();
+}
+
+function getAuditLogs({ limit = 20 } = {}) {
+  const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const stmt = db.prepare(`
+    SELECT id, action, target, detail, actor_ip, created_time
+    FROM audit_log
+    ORDER BY id DESC
+    LIMIT ?
+  `);
+  stmt.bind([safeLimit]);
+
+  const rows = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    let detail = null;
+    if (row.detail) {
+      try {
+        detail = JSON.parse(row.detail);
+      } catch {
+        detail = row.detail;
+      }
+    }
+    rows.push({
+      id: row.id,
+      action: row.action,
+      target: row.target,
+      detail,
+      actorIp: row.actor_ip,
+      createdTime: row.created_time
+    });
+  }
+  stmt.free();
+  return rows;
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -304,5 +366,7 @@ module.exports = {
   getAllShareTexts,
   deleteShareTextById,
   deleteShareTextsByIds,
-  getStats
+  getStats,
+  createAuditLog,
+  getAuditLogs
 };

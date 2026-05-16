@@ -19,3 +19,5 @@ services:
       - TRUST_PROXY=${TRUST_PROXY:-false}
       # 管理员令牌（必须设置才能启用 /admin/ 后台）
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      # CORS 白名单：未设置时仍允许任意源；推荐生产环境显式配置
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}

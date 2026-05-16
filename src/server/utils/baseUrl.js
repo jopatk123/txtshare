@@ -6,6 +6,10 @@ function normalizeBaseUrl(value) {
   return value.replace(/\/+$/, '');
 }
 
+function getDefaultPort(port) {
+  return String(port || process.env.PORT || 6006);
+}
+
 function getConfiguredBaseUrl(port) {
   const explicitBaseUrl = normalizeBaseUrl(process.env.BASE_URL);
 
@@ -13,7 +17,7 @@ function getConfiguredBaseUrl(port) {
     return explicitBaseUrl;
   }
 
-  return `http://localhost:${port}`;
+  return `http://localhost:${getDefaultPort(port)}`;
 }
 
 /**
@@ -35,7 +39,7 @@ function getRequestBaseUrl(req, port) {
     return `${req.protocol}://${req.get('host')}`;
   }
 
-  return `http://localhost:${port}`;
+  return `http://localhost:${getDefaultPort(port)}`;
 }
 
 /**

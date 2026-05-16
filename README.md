@@ -83,7 +83,7 @@ docker run -d \
 
 `ALLOWED_ORIGINS` 用于配置 CORS 白名单。未设置或为 `*` 时允许任意来源（兼容默认部署）；多个来源以逗号分隔，例如 `https://app.example.com,https://admin.example.com`，配置后仅这些来源可跨域调用 API。
 
-如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY`、`ADMIN_TOKEN`、`ALLOWED_ORIGINS`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
+如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY`、`ADMIN_TOKEN`、`ALLOWED_ORIGINS`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。出于安全考虑，后台令牌默认**仅保存在当前页面内存**，刷新或关闭页面后需要重新登录。
 
 ### 健康检查
 
@@ -93,7 +93,9 @@ docker run -d \
 
 - 全局响应头：`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Cross-Origin-Opener-Policy`、`Permissions-Policy`；HTTPS 请求额外加 `Strict-Transport-Security`。
 - 前端依赖（marked / DOMPurify / highlight.js）全部本地化，无 CDN 运行时依赖。
-- 管理员 token 使用 `crypto.timingSafeEqual` 比对，公开 / 创建 / 管理三层差异化限流。
+- 管理员 token 先做固定长度摘要再走 `crypto.timingSafeEqual` 比对，避免长度侧信道；后台页面默认不持久化令牌。
+- 后台敏感操作（单删 / 批删 / 清理过期）会写入 `audit_log` 审计表，并可通过 `/api/admin/audit-logs` 查看最近记录。
+- 公开 / 创建 / 分享页 / 管理接口采用分层限流，避免通过页面路由绕过 API 限制。
 - sql.js 落盘采用「临时文件 + fsync + rename」原子替换，避免半写损坏整库。
 - Docker 镜像以 `node` 非 root 用户运行，并启用 `npm ci --omit=dev` 走锁文件构建。
 
@@ -160,6 +162,17 @@ GET /s/:id
 
 ```
 GET /api/health
+```
+
+### 管理后台（需 `ADMIN_TOKEN`）
+
+```
+GET /api/admin/stats
+GET /api/admin/shares?page=1&limit=20&search=
+GET /api/admin/audit-logs?limit=10
+DELETE /api/admin/shares/:id
+DELETE /api/admin/shares
+POST /api/admin/cleanup
 ```
 
 ## 项目结构

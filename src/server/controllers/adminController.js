@@ -17,6 +17,17 @@ async function getStats(req, res) {
   }
 }
 
+async function getAuditLogs(req, res) {
+  try {
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const rows = shareTextModel.getAuditLogs({ limit });
+    res.json({ success: true, data: { rows, limit } });
+  } catch (error) {
+    logger.error('Admin getAuditLogs error:', error);
+    res.status(500).json({ success: false, error: '服务器错误' });
+  }
+}
+
 /**
  * 获取所有分享列表（分页）
  * GET /api/admin/shares?page=1&limit=20&search=
@@ -28,7 +39,7 @@ async function listShares(req, res) {
     const search = String(req.query.search || '').trim().slice(0, 100);
 
     const result = shareTextModel.getAllShareTexts({ page, limit, search });
-    const baseUrl = getRequestBaseUrl(req);
+    const baseUrl = getRequestBaseUrl(req, process.env.PORT);
 
     const rows = result.rows.map(row => ({
       id: row.id,
@@ -73,6 +84,12 @@ async function deleteShare(req, res) {
     }
 
     cache.del(id);
+    shareTextModel.createAuditLog({
+      action: 'admin.deleteShare',
+      target: id,
+      actorIp: req.ip,
+      detail: { deleted: true }
+    });
     logger.info(`Admin deleted share: ${id}`);
     res.json({ success: true });
   } catch (error) {
@@ -101,6 +118,16 @@ async function deleteBatch(req, res) {
 
     const deleted = shareTextModel.deleteShareTextsByIds(validIds);
     cache.delMultiple(validIds);
+    shareTextModel.createAuditLog({
+      action: 'admin.deleteBatch',
+      target: 'share_text',
+      actorIp: req.ip,
+      detail: {
+        requestedIds: ids.length,
+        validIds,
+        deleted
+      }
+    });
 
     logger.info(`Admin batch deleted ${deleted} shares`);
     res.json({ success: true, data: { deleted } });
@@ -123,6 +150,16 @@ async function cleanupExpired(req, res) {
       cache.delMultiple(expiredIds);
     }
 
+    shareTextModel.createAuditLog({
+      action: 'admin.cleanupExpired',
+      target: 'expired_records',
+      actorIp: req.ip,
+      detail: {
+        deleted,
+        expiredIds
+      }
+    });
+
     logger.info(`Admin cleanup: ${deleted} expired records deleted`);
     res.json({ success: true, data: { deleted } });
   } catch (error) {
@@ -133,6 +170,7 @@ async function cleanupExpired(req, res) {
 
 module.exports = {
   getStats,
+  getAuditLogs,
   listShares,
   deleteShare,
   deleteBatch,

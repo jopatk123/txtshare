@@ -122,16 +122,20 @@ function openImageViewer(src) {
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
+  function closeViewer() {
+    document.removeEventListener('keydown', handleEsc);
+    overlay.remove();
+  }
+
   // 点击遮罩关闭
   overlay.addEventListener('click', function() {
-    overlay.remove();
+    closeViewer();
   });
 
   // ESC 键关闭
   function handleEsc(e) {
     if (e.key === 'Escape') {
-      overlay.remove();
-      document.removeEventListener('keydown', handleEsc);
+      closeViewer();
     }
   }
   document.addEventListener('keydown', handleEsc);

@@ -3,6 +3,7 @@ const { getConfiguredBaseUrl, getRequestBaseUrl, normalizeBaseUrl, warnIfBaseUrl
 describe('baseUrl utility', () => {
   const originalBaseUrl = process.env.BASE_URL;
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalPort = process.env.PORT;
 
   afterEach(() => {
     if (originalBaseUrl === undefined) {
@@ -15,6 +16,12 @@ describe('baseUrl utility', () => {
       delete process.env.NODE_ENV;
     } else {
       process.env.NODE_ENV = originalNodeEnv;
+    }
+
+    if (originalPort === undefined) {
+      delete process.env.PORT;
+    } else {
+      process.env.PORT = originalPort;
     }
   });
 
@@ -61,6 +68,18 @@ describe('baseUrl utility', () => {
     };
 
     expect(getRequestBaseUrl(req, 6006)).toBe('http://localhost:6006');
+  });
+
+  test('falls back to process.env.PORT when port arg is omitted', () => {
+    delete process.env.BASE_URL;
+    process.env.NODE_ENV = 'production';
+    process.env.PORT = '7001';
+    const req = {
+      protocol: 'https',
+      get: () => 'attacker.example.com'
+    };
+
+    expect(getRequestBaseUrl(req)).toBe('http://localhost:7001');
   });
 
   test('warnIfBaseUrlMissing emits warning in production without BASE_URL', () => {

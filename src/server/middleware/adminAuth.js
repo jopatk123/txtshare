@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 const logger = require('./logger');
 
+function hashTokenForComparison(token) {
+  return crypto.createHash('sha256').update(token, 'utf8').digest();
+}
+
 /**
  * 管理员认证中间件
  * 通过 Authorization: Bearer <token> 或 X-Admin-Token: <token> 请求头验证。
@@ -34,11 +38,10 @@ function adminAuth(req, res, next) {
 
   // 使用时间安全比较，防止 timing attack
   try {
-    const adminBuf = Buffer.from(adminToken, 'utf8');
-    const requestBuf = Buffer.from(requestToken, 'utf8');
-    const valid =
-      adminBuf.length === requestBuf.length &&
-      crypto.timingSafeEqual(adminBuf, requestBuf);
+    const valid = crypto.timingSafeEqual(
+      hashTokenForComparison(adminToken),
+      hashTokenForComparison(requestToken)
+    );
 
     if (!valid) {
       logger.warn(`Admin auth failed from IP: ${req.ip}`);

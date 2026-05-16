@@ -13,6 +13,9 @@ router.use(adminAuth);
 // 统计信息
 router.get('/stats', adminController.getStats);
 
+// 最近审计日志
+router.get('/audit-logs', adminController.getAuditLogs);
+
 // 分享列表（分页 + 搜索）
 router.get('/shares', adminController.listShares);
 

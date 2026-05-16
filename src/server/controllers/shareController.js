@@ -77,7 +77,7 @@ async function createShareText(req, res) {
     }, expireTime);
 
     // 构建分享链接
-    const shareUrl = `${getRequestBaseUrl(req)}/s/${id}`;
+    const shareUrl = `${getRequestBaseUrl(req, process.env.PORT)}/s/${id}`;
 
     logger.info(`Created share text: ${id}, expire: ${expireTime ? formatDateTime(expireTime) : 'never'}`);
 
@@ -165,7 +165,6 @@ async function getShareText(req, res) {
     // 同步更新缓存中的 viewCount
     if (textData.viewCount !== undefined) {
       textData.viewCount = (textData.viewCount || 0) + 1;
-      cache.setWithExpireTime(id, textData, textData.expireTime);
     }
 
     logger.info(`Accessed share text: ${id}`);

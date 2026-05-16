@@ -9,3 +9,15 @@ CREATE TABLE IF NOT EXISTS share_text (
 
 -- 为expire_time字段添加索引，提升过期数据查询效率
 CREATE INDEX IF NOT EXISTS idx_expire_time ON share_text(expire_time);
+
+-- 管理员审计日志
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    target TEXT NOT NULL,
+    detail TEXT,
+    actor_ip TEXT,
+    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_time ON audit_log(created_time DESC);

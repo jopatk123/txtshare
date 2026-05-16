@@ -54,8 +54,25 @@ const adminLimiter = rateLimit({
   },
 });
 
+/**
+ * 分享页面限流：限制 /s/:id 页面请求，避免绕过公开 API 限流直接打页面路由。
+ */
+const sharePageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  skip: skipInTest,
+  message: '访问过于频繁，请稍后再试',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, _next, options) => {
+    logger.warn(`Share page rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).type('text/plain').send(options.message);
+  },
+});
+
 module.exports = {
   apiLimiter,
   createLimiter,
   adminLimiter,
+  sharePageLimiter,
 };
