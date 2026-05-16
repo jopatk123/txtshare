@@ -40,13 +40,28 @@ async function initDatabase() {
 
 /**
  * 保存数据库到文件（立即保存，用于关键操作）
+ *
+ * 使用临时文件 + fsync + rename 进行原子替换，避免半写损坏整库：
+ * 1. 写入同目录下的 .tmp 文件
+ * 2. fsync 确保数据落盘
+ * 3. rename 原子替换，保证读取方要么看到旧库要么看到新库
  */
 function saveDatabase() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+  if (!db) return;
+
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  const tmpPath = `${dbPath}.tmp`;
+
+  const fd = fs.openSync(tmpPath, 'w');
+  try {
+    fs.writeSync(fd, buffer, 0, buffer.length, 0);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
   }
+
+  fs.renameSync(tmpPath, dbPath);
 }
 
 /**

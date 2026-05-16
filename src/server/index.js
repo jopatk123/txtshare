@@ -4,7 +4,7 @@ const schedule = require('node-schedule');
 const shareTextModel = require('./models/shareText');
 const cache = require('./middleware/cache');
 const logger = require('./middleware/logger');
-const { getConfiguredBaseUrl } = require('./utils/baseUrl');
+const { getConfiguredBaseUrl, warnIfBaseUrlMissing } = require('./utils/baseUrl');
 const { createShutdownHandler } = require('./utils/gracefulShutdown');
 
 const PORT = process.env.PORT || 6006;
@@ -25,6 +25,7 @@ async function startServer() {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Base URL: ${getConfiguredBaseUrl(PORT)}`);
+      warnIfBaseUrlMissing(logger);
     });
 
     // 定时任务：每天凌晨2点清理过期数据

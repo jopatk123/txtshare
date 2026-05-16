@@ -29,10 +29,18 @@ async function initDatabase() {
   // 执行初始化
   db.run(initSql);
   
-  // 保存到文件
+  // 保存到文件（原子写）
   const data = db.export();
   const buffer = Buffer.from(data);
-  fs.writeFileSync(dbPath, buffer);
+  const tmpPath = `${dbPath}.tmp`;
+  const fd = fs.openSync(tmpPath, 'w');
+  try {
+    fs.writeSync(fd, buffer, 0, buffer.length, 0);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmpPath, dbPath);
   
   console.log('数据库初始化完成:', dbPath);
   

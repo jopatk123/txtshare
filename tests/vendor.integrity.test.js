@@ -54,4 +54,27 @@ describe('Vendor 文件完整性', () => {
       expect(content).toContain('sanitize');
     });
   });
+
+  describe('highlight.min.js', () => {
+    const filePath = path.join(vendorDir, 'highlight.min.js');
+
+    test('文件存在', () => {
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    test('文件不为空（大于 50KB）', () => {
+      const stats = fs.statSync(filePath);
+      expect(stats.size).toBeGreaterThan(50 * 1024);
+    });
+
+    test('文件内容包含 highlight.js 标识', () => {
+      const content = fs.readFileSync(filePath, 'utf8');
+      expect(content).toMatch(/Highlight\.js/i);
+    });
+
+    test('文件内容包含 hljs 全局导出', () => {
+      const content = fs.readFileSync(filePath, 'utf8');
+      expect(content).toContain('hljs');
+    });
+  });
 });

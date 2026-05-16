@@ -77,11 +77,25 @@ docker run -d \
   text-share
 ```
 
-`BASE_URL` 是可选项，但生产环境建议显式设置。若不设置，服务端会根据当前请求动态生成分享链接。
+`BASE_URL` 在生产环境（`NODE_ENV=production`）下强烈建议显式配置：当未配置时，服务端会拒绝从请求 `Host` 头推断分享链接（防止 Host 注入污染链接），并在启动时打印告警，分享链接会回退到 `http://localhost:<PORT>`。非生产环境下保留原有的根据请求动态生成的行为，方便本地多主机调试。
 
 `TRUST_PROXY` 默认应保持关闭。只有在应用前方存在你明确控制的反向代理时，才应开启；例如单层 Nginx 反向代理可设置为 `1`。
 
-如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY` 和 `ADMIN_TOKEN`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
+`ALLOWED_ORIGINS` 用于配置 CORS 白名单。未设置或为 `*` 时允许任意来源（兼容默认部署）；多个来源以逗号分隔，例如 `https://app.example.com,https://admin.example.com`，配置后仅这些来源可跨域调用 API。
+
+如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY`、`ADMIN_TOKEN`、`ALLOWED_ORIGINS`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。
+
+### 健康检查
+
+服务暴露 `GET /api/health` 端点，返回 `{ success, status, uptime }`，可作为容器探活与负载均衡探针。Dockerfile 已内置 `HEALTHCHECK` 调用该端点。
+
+### 安全特性
+
+- 全局响应头：`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Cross-Origin-Opener-Policy`、`Permissions-Policy`；HTTPS 请求额外加 `Strict-Transport-Security`。
+- 前端依赖（marked / DOMPurify / highlight.js）全部本地化，无 CDN 运行时依赖。
+- 管理员 token 使用 `crypto.timingSafeEqual` 比对，公开 / 创建 / 管理三层差异化限流。
+- sql.js 落盘采用「临时文件 + fsync + rename」原子替换，避免半写损坏整库。
+- Docker 镜像以 `node` 非 root 用户运行，并启用 `npm ci --omit=dev` 走锁文件构建。
 
 ## Nginx 配置
 
@@ -140,6 +154,12 @@ GET /api/text/:id
 
 ```
 GET /s/:id
+```
+
+### 健康检查
+
+```
+GET /api/health
 ```
 
 ## 项目结构
