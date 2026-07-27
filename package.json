@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "description": "轻量级文本分享网页工具",
   "main": "src/server/index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node src/server/index.js",
     "dev": "nodemon src/server/index.js",
     "init-db": "node src/server/db/initDb.js",
-    "test": "jest --testPathPatterns=tests/",
-    "lint": "eslint src/server/ tests/",
-    "lint:fix": "eslint src/server/ tests/ --fix"
+    "test": "jest --config=jest.config.js",
+    "test:coverage": "jest --config=jest.config.js --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{js,css,html}\" \"tests/**/*.js\" \"*.{js,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,css,html}\" \"tests/**/*.js\" \"*.{js,json,md}\""
   },
   "keywords": [
     "text-share",
@@ -19,21 +25,23 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
-    "express": "^4.18.2",
+    "express": "^4.22.1",
     "express-rate-limit": "^7.1.5",
     "node-cache": "^5.1.2",
     "node-schedule": "^2.1.1",
-    "sql.js": "^1.10.3",
     "winston": "^3.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.3.0",
+    "eslint-config-prettier": "^9.1.2",
     "globals": "^17.6.0",
     "jest": "^30.3.0",
     "nodemon": "^3.0.2",
+    "prettier": "^3.9.6",
     "supertest": "^7.2.2"
   }
 }

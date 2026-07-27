@@ -13,14 +13,14 @@ describe('CORS configuration', () => {
     });
 
     test('parses single origin', () => {
-      expect(parseAllowedOrigins('https://app.example.com')).toEqual([
-        'https://app.example.com'
-      ]);
+      expect(parseAllowedOrigins('https://app.example.com')).toEqual(['https://app.example.com']);
     });
 
     test('parses comma-separated multi-origin list', () => {
-      expect(parseAllowedOrigins('https://a.example, https://b.example ,'))
-        .toEqual(['https://a.example', 'https://b.example']);
+      expect(parseAllowedOrigins('https://a.example, https://b.example ,')).toEqual([
+        'https://a.example',
+        'https://b.example',
+      ]);
     });
   });
 
@@ -30,10 +30,14 @@ describe('CORS configuration', () => {
         const req = { method: 'GET', headers };
         const res = {
           _headers: {},
-          getHeader(k) { return this._headers[k.toLowerCase()]; },
-          setHeader(k, v) { this._headers[k.toLowerCase()] = v; },
+          getHeader(k) {
+            return this._headers[k.toLowerCase()];
+          },
+          setHeader(k, v) {
+            this._headers[k.toLowerCase()] = v;
+          },
           end() {},
-          statusCode: 200
+          statusCode: 200,
         };
         mw(req, res, (err) => resolve({ err, res }));
       });

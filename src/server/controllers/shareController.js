@@ -1,10 +1,18 @@
 const shareTextModel = require('../models/shareText');
 const { generateId } = require('../utils/idGenerator');
 const { calculateExpireTime, formatDateTime } = require('../utils/dateUtil');
-const { validateContent, validateExpireType, validateCustomDays, validateShareId } = require('../utils/validator');
+const {
+  validateContent,
+  validateExpireType,
+  validateCustomDays,
+  validateShareId,
+} = require('../utils/validator');
 const { getRequestBaseUrl } = require('../utils/baseUrl');
 const cache = require('../middleware/cache');
 const logger = require('../middleware/logger');
+
+// 从模型层引用常量，避免魔法数字
+const { MAX_ID_RETRIES } = shareTextModel;
 
 /**
  * 创建分享文本
@@ -19,7 +27,7 @@ async function createShareText(req, res) {
     if (!contentValidation.valid) {
       return res.status(400).json({
         success: false,
-        error: contentValidation.error
+        error: contentValidation.error,
       });
     }
 
@@ -28,7 +36,7 @@ async function createShareText(req, res) {
     if (!expireTypeValidation.valid) {
       return res.status(400).json({
         success: false,
-        error: expireTypeValidation.error
+        error: expireTypeValidation.error,
       });
     }
 
@@ -38,14 +46,14 @@ async function createShareText(req, res) {
       if (!daysValidation.valid) {
         return res.status(400).json({
           success: false,
-          error: daysValidation.error
+          error: daysValidation.error,
         });
       }
     }
 
     // 生成唯一ID（极小概率会碰撞，这里做重试兜底）
     let id = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < MAX_ID_RETRIES; attempt++) {
       const candidate = generateId(10);
       const exists = shareTextModel.getShareTextById(candidate);
       if (!exists) {
@@ -57,7 +65,7 @@ async function createShareText(req, res) {
     if (!id) {
       return res.status(500).json({
         success: false,
-        error: '生成分享链接失败，请稍后重试'
+        error: '生成分享链接失败，请稍后重试',
       });
     }
 
@@ -69,17 +77,23 @@ async function createShareText(req, res) {
 
     // 存入缓存（包含完整字段，保持与数据库查询结果一致）
     const now = new Date();
-    cache.setWithExpireTime(id, {
-      content: content,
-      expireTime: expireTime ? expireTime.toISOString() : null,
-      createTime: now.toISOString(),
-      viewCount: 0
-    }, expireTime);
+    cache.setWithExpireTime(
+      id,
+      {
+        content: content,
+        expireTime: expireTime ? expireTime.toISOString() : null,
+        createTime: now.toISOString(),
+        viewCount: 0,
+      },
+      expireTime
+    );
 
     // 构建分享链接
     const shareUrl = `${getRequestBaseUrl(req, process.env.PORT)}/s/${id}`;
 
-    logger.info(`Created share text: ${id}, expire: ${expireTime ? formatDateTime(expireTime) : 'never'}`);
+    logger.info(
+      `Created share text: ${id}, expire: ${expireTime ? formatDateTime(expireTime) : 'never'}`
+    );
 
     res.json({
       success: true,
@@ -87,15 +101,14 @@ async function createShareText(req, res) {
         id,
         url: shareUrl,
         expireTime: expireTime ? expireTime.toISOString() : null,
-        expireTimeFormatted: formatDateTime(expireTime)
-      }
+        expireTimeFormatted: formatDateTime(expireTime),
+      },
     });
-
   } catch (error) {
     logger.error('Create share text error:', error);
     res.status(500).json({
       success: false,
-      error: '服务器错误，请稍后重试'
+      error: '服务器错误，请稍后重试',
     });
   }
 }
@@ -113,7 +126,7 @@ async function getShareText(req, res) {
     if (!idValidation.valid) {
       return res.status(400).json({
         success: false,
-        error: idValidation.error
+        error: idValidation.error,
       });
     }
 
@@ -127,7 +140,7 @@ async function getShareText(req, res) {
       if (!record) {
         return res.status(404).json({
           success: false,
-          error: '链接不存在'
+          error: '链接不存在',
         });
       }
 
@@ -135,7 +148,7 @@ async function getShareText(req, res) {
       if (shareTextModel.isExpired(record)) {
         return res.status(410).json({
           success: false,
-          error: '链接已失效'
+          error: '链接已失效',
         });
       }
 
@@ -143,7 +156,7 @@ async function getShareText(req, res) {
         content: record.content,
         expireTime: record.expire_time,
         createTime: record.create_time,
-        viewCount: record.view_count
+        viewCount: record.view_count,
       };
 
       // 存入缓存
@@ -154,7 +167,7 @@ async function getShareText(req, res) {
         cache.del(id);
         return res.status(410).json({
           success: false,
-          error: '链接已失效'
+          error: '链接已失效',
         });
       }
     }
@@ -175,20 +188,19 @@ async function getShareText(req, res) {
         content: textData.content,
         createTime: textData.createTime,
         expireTime: textData.expireTime,
-        expireTimeFormatted: formatDateTime(textData.expireTime)
-      }
+        expireTimeFormatted: formatDateTime(textData.expireTime),
+      },
     });
-
   } catch (error) {
     logger.error('Get share text error:', error);
     res.status(500).json({
       success: false,
-      error: '服务器错误，请稍后重试'
+      error: '服务器错误，请稍后重试',
     });
   }
 }
 
 module.exports = {
   createShareText,
-  getShareText
+  getShareText,
 };

@@ -13,7 +13,7 @@ function parseAllowedOrigins(raw) {
 
   return trimmed
     .split(',')
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -32,11 +32,11 @@ function buildCorsMiddleware(allowedOriginsEnv = process.env.ALLOWED_ORIGINS) {
       }
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
-    credentials: false
+    credentials: false,
   });
 }
 
 module.exports = {
   parseAllowedOrigins,
-  buildCorsMiddleware
+  buildCorsMiddleware,
 };

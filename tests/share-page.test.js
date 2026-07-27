@@ -6,7 +6,7 @@ describe('share page route', () => {
   let app;
 
   beforeAll(async () => {
-    await shareTextModel.initDatabase();
+    shareTextModel.initDatabase();
     app = require('../src/server/app');
   });
 

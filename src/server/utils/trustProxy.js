@@ -37,5 +37,5 @@ function getTrustProxySetting() {
 
 module.exports = {
   parseTrustProxy,
-  getTrustProxySetting
+  getTrustProxySetting,
 };

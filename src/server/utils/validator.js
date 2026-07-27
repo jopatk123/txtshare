@@ -17,21 +17,21 @@ function validateContent(content) {
   if (!content || typeof content !== 'string') {
     return {
       valid: false,
-      error: '文本内容不能为空'
+      error: '文本内容不能为空',
     };
   }
 
   if (content.length === 0 || content.trim().length === 0) {
     return {
       valid: false,
-      error: '文本内容不能为空'
+      error: '文本内容不能为空',
     };
   }
 
   if (Buffer.byteLength(content, 'utf8') > MAX_TEXT_LENGTH) {
     return {
       valid: false,
-      error: '内容过大，请删减后重试（最大2MB）'
+      error: '内容过大，请删减后重试（最大2MB）',
     };
   }
 
@@ -51,7 +51,7 @@ function validateExpireType(expireType) {
   if (!VALID_EXPIRE_TYPES.includes(expireType)) {
     return {
       valid: false,
-      error: '无效的过期类型'
+      error: '无效的过期类型',
     };
   }
 
@@ -67,14 +67,14 @@ function validateCustomDays(days) {
   if (typeof days !== 'number' || !Number.isInteger(days)) {
     return {
       valid: false,
-      error: '自定义天数必须是整数'
+      error: '自定义天数必须是整数',
     };
   }
 
   if (days < 1 || days > 365) {
     return {
       valid: false,
-      error: '自定义天数必须在1-365之间'
+      error: '自定义天数必须在1-365之间',
     };
   }
 
@@ -90,7 +90,7 @@ function validateShareId(id) {
   if (!id || typeof id !== 'string') {
     return {
       valid: false,
-      error: '无效的分享ID'
+      error: '无效的分享ID',
     };
   }
 
@@ -98,7 +98,7 @@ function validateShareId(id) {
   if (!/^[A-Za-z0-9]{8,16}$/.test(id)) {
     return {
       valid: false,
-      error: '无效的分享ID格式'
+      error: '无效的分享ID格式',
     };
   }
 
@@ -111,5 +111,5 @@ module.exports = {
   validateContent,
   validateExpireType,
   validateCustomDays,
-  validateShareId
+  validateShareId,
 };

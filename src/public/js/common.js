@@ -1,6 +1,7 @@
 /**
  * 前端公共工具函数
  */
+/* exported formatDateTime, showToast, fallbackCopy */
 
 /**
  * 格式化日期时间
@@ -54,7 +55,7 @@ function fallbackCopy(text) {
   try {
     document.execCommand('copy');
     showToast('内容已复制到剪贴板', 'success');
-  } catch (err) {
+  } catch (_err) {
     showToast('复制失败，请手动复制', 'error');
   }
 

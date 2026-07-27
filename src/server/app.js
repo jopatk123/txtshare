@@ -8,6 +8,8 @@ const logger = require('./middleware/logger');
 const securityHeaders = require('./middleware/securityHeaders');
 const { buildCorsMiddleware } = require('./middleware/corsConfig');
 const { getTrustProxySetting } = require('./utils/trustProxy');
+const shareTextModel = require('./models/shareText');
+const cache = require('./middleware/cache');
 
 const app = express();
 
@@ -26,9 +28,60 @@ app.use(buildCorsMiddleware());
 app.use(express.json({ limit: '3mb' })); // 限制请求体大小（支持内嵌图片）
 app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
-// 简易健康检查（供容器/负载均衡探活）
-app.get('/api/health', (req, res) => {
-  res.json({ success: true, status: 'ok', uptime: process.uptime() });
+// ── 健康检查 ────────────────────────────────────────────────────────────────
+//
+// 区分 liveness 与 readiness，避免编排器在 DB 抖动时误杀进程：
+// - /api/health/live  仅校验进程存活，永远返回 200（除非进程已死）
+// - /api/health/ready 校验 DB 连接与缓存状态，失败返回 503
+// - /api/health       综合状态，兼容旧端点与 Dockerfile HEALTHCHECK
+
+app.get('/api/health/live', (_req, res) => {
+  res.json({ success: true, status: 'live', uptime: process.uptime() });
+});
+
+app.get('/api/health/ready', (_req, res) => {
+  const checks = { database: false, cache: false };
+
+  try {
+    const db = shareTextModel.getDb();
+    if (db) {
+      db.prepare('SELECT 1').get();
+      checks.database = true;
+    }
+  } catch (error) {
+    logger.error('Health check DB probe failed:', error);
+  }
+
+  checks.cache = cache.isHealthy();
+
+  const ok = checks.database && checks.cache;
+  res.status(ok ? 200 : 503).json({
+    success: ok,
+    status: ok ? 'ready' : 'degraded',
+    checks,
+    uptime: process.uptime(),
+  });
+});
+
+app.get('/api/health', (_req, res) => {
+  // 兼容旧端点：执行 readiness 检查但不返回 503（避免旧监控告警）
+  let dbOk = false;
+  try {
+    const db = shareTextModel.getDb();
+    if (db) {
+      db.prepare('SELECT 1').get();
+      dbOk = true;
+    }
+  } catch (error) {
+    logger.error('Health check DB probe failed:', error);
+  }
+  const cacheOk = cache.isHealthy();
+  res.json({
+    success: true,
+    status: dbOk && cacheOk ? 'ok' : 'degraded',
+    checks: { database: dbOk, cache: cacheOk },
+    uptime: process.uptime(),
+  });
 });
 
 // 请求日志
@@ -78,7 +131,7 @@ app.use((err, req, res, _next) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
-    error: '服务器内部错误'
+    error: '服务器内部错误',
   });
 });
 

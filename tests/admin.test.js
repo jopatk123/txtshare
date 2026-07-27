@@ -18,15 +18,15 @@ process.env.ADMIN_TOKEN = TEST_TOKEN;
 // 需要在数据库初始化后加载 app
 let app;
 beforeAll(async () => {
-  await shareTextModel.initDatabase();
+  shareTextModel.initDatabase();
   app = require('../src/server/app');
 });
 
 afterEach(() => {
   // 每个测试后清理测试数据，避免状态污染
   const db = shareTextModel.getDb();
-  db.run("DELETE FROM share_text WHERE id LIKE 'test%'");
-  db.run('DELETE FROM audit_log');
+  db.exec("DELETE FROM share_text WHERE id LIKE 'test%'");
+  db.exec('DELETE FROM audit_log');
   cache.delMultiple(['testA', 'testB', 'testC']);
   if (originalBaseUrl === undefined) delete process.env.BASE_URL;
   else process.env.BASE_URL = originalBaseUrl;
@@ -58,9 +58,7 @@ describe('Admin 认证', () => {
   });
 
   test('X-Admin-Token 头也支持认证', async () => {
-    const res = await request(app)
-      .get('/api/admin/stats')
-      .set('X-Admin-Token', TEST_TOKEN);
+    const res = await request(app).get('/api/admin/stats').set('X-Admin-Token', TEST_TOKEN);
     expect(res.status).toBe(200);
   });
 
@@ -141,7 +139,7 @@ describe('GET /api/admin/shares', () => {
     const res = await request(app)
       .get('/api/admin/shares?limit=50')
       .set('Authorization', `Bearer ${TEST_TOKEN}`);
-    const row = res.body.data.rows.find(r => r.id === 'testA');
+    const row = res.body.data.rows.find((r) => r.id === 'testA');
     expect(row).toBeDefined();
     expect(row).toHaveProperty('id');
     expect(row).toHaveProperty('contentPreview');
@@ -164,7 +162,7 @@ describe('GET /api/admin/shares', () => {
       .set('Host', 'evil.example.com')
       .set('Authorization', `Bearer ${TEST_TOKEN}`);
 
-    const row = res.body.data.rows.find(r => r.id === 'testA');
+    const row = res.body.data.rows.find((r) => r.id === 'testA');
     expect(row.url).toBe('http://localhost:6006/s/testA');
   });
 
@@ -174,7 +172,7 @@ describe('GET /api/admin/shares', () => {
     const res = await request(app)
       .get('/api/admin/shares?limit=50')
       .set('Authorization', `Bearer ${TEST_TOKEN}`);
-    const row = res.body.data.rows.find(r => r.id === 'testB');
+    const row = res.body.data.rows.find((r) => r.id === 'testB');
     expect(row).toBeDefined();
     expect(row.isExpired).toBe(true);
   });
@@ -187,7 +185,7 @@ describe('GET /api/admin/shares', () => {
       .set('Authorization', `Bearer ${TEST_TOKEN}`);
     expect(res.status).toBe(200);
     const rows = res.body.data.rows;
-    expect(rows.every(r => r.id.includes('testA'))).toBe(true);
+    expect(rows.every((r) => r.id.includes('testA'))).toBe(true);
   });
 
   test('limit 参数最大不超过 100', async () => {

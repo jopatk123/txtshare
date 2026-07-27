@@ -1,8 +1,9 @@
 /**
  * 主页面脚本
  */
+/* global formatDateTime, showToast, ImageCompressor */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('shareForm');
   const editor = document.getElementById('textContent');
   const expireType = document.getElementById('expireType');
@@ -63,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ======== 监听过期类型变化 ========
-  expireType.addEventListener('change', function() {
+  expireType.addEventListener('change', function () {
     if (this.value === 'custom') {
       customDaysWrapper.classList.add('show');
     } else {
@@ -72,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ======== 图片粘贴处理 ========
-  editor.addEventListener('paste', async function(e) {
+  editor.addEventListener('paste', async function (e) {
     const imageFile = ImageCompressor.getImageFromClipboard(e);
     if (!imageFile) return; // 非图片，走默认行为（允许粘贴文本）
 
@@ -81,17 +82,17 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ======== 图片拖拽处理 ========
-  editor.addEventListener('dragover', function(e) {
+  editor.addEventListener('dragover', function (e) {
     e.preventDefault();
     editor.classList.add('drag-over');
   });
 
-  editor.addEventListener('dragleave', function(e) {
+  editor.addEventListener('dragleave', function (e) {
     e.preventDefault();
     editor.classList.remove('drag-over');
   });
 
-  editor.addEventListener('drop', async function(e) {
+  editor.addEventListener('drop', async function (e) {
     editor.classList.remove('drag-over');
     const imageFile = ImageCompressor.getImageFromDrop(e);
     if (!imageFile) return;
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedRange = saveCursorRange();
 
     try {
-      const { dataUrl, info } = await ImageCompressor.compress(imageFile, function(msg) {
+      const { dataUrl, info } = await ImageCompressor.compress(imageFile, function (msg) {
         showImageProgress(msg);
       });
 
@@ -160,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
     removeBtn.className = 'editor-img-remove';
     removeBtn.title = '移除图片';
     removeBtn.innerHTML = '&times;';
-    removeBtn.addEventListener('click', function(e) {
+    removeBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       removeEditorImage(wrapper, index);
     });
@@ -206,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
   /**
    * 从编辑器中移除图片 wrapper
    */
-  function removeEditorImage(wrapperEl, index) {
+  function removeEditorImage(wrapperEl) {
     const prev = wrapperEl.previousSibling;
     const next = wrapperEl.nextSibling;
     if (prev && prev.nodeName === 'BR') prev.remove();
@@ -232,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ======== 表单提交 ========
-  form.addEventListener('submit', async function(e) {
+  form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const content = getEditorContent();
@@ -269,8 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({
           content: content,
           expireType: expireTypeValue,
-          expireDays: expireDaysValue
-        })
+          expireDays: expireDaysValue,
+        }),
       });
 
       const data = await response.json();
@@ -293,11 +294,12 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ======== 复制链接 ========
-  copyBtn.addEventListener('click', function() {
+  copyBtn.addEventListener('click', function () {
     shareUrl.select();
 
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl.value)
+      navigator.clipboard
+        .writeText(shareUrl.value)
         .then(() => showToast('链接已复制到剪贴板', 'success'))
         .catch(() => {
           document.execCommand('copy');
@@ -322,4 +324,3 @@ document.addEventListener('DOMContentLoaded', function() {
 
   editor.addEventListener('input', updateCharCounter);
 });
-

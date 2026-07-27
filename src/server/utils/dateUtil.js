@@ -42,16 +42,16 @@ function calculateExpireTime(expireType, customDays = 0) {
  */
 function formatDateTime(date) {
   if (!date) return '永不过期';
-  
+
   const d = typeof date === 'string' ? new Date(date) : date;
-  
+
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
   const seconds = String(d.getSeconds()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
@@ -64,16 +64,16 @@ function calculateCacheTTL(expireTime) {
   if (!expireTime) {
     return 0; // 0表示node-cache中的无限期
   }
-  
+
   const expire = typeof expireTime === 'string' ? new Date(expireTime) : expireTime;
   const now = new Date();
   const ttl = Math.floor((expire.getTime() - now.getTime()) / 1000);
-  
+
   return ttl > 0 ? ttl : -1; // -1表示已过期，不应缓存
 }
 
 module.exports = {
   calculateExpireTime,
   formatDateTime,
-  calculateCacheTTL
+  calculateCacheTTL,
 };

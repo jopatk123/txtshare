@@ -36,19 +36,21 @@ async function listShares(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-    const search = String(req.query.search || '').trim().slice(0, 100);
+    const search = String(req.query.search || '')
+      .trim()
+      .slice(0, 100);
 
     const result = shareTextModel.getAllShareTexts({ page, limit, search });
     const baseUrl = getRequestBaseUrl(req, process.env.PORT);
 
-    const rows = result.rows.map(row => ({
+    const rows = result.rows.map((row) => ({
       id: row.id,
       contentPreview: row.content_preview,
       createTime: row.create_time,
       expireTime: row.expire_time,
       viewCount: row.view_count,
       url: `${baseUrl}/s/${row.id}`,
-      isExpired: row.expire_time ? new Date(row.expire_time) < new Date() : false
+      isExpired: row.expire_time ? new Date(row.expire_time) < new Date() : false,
     }));
 
     res.json({
@@ -57,8 +59,8 @@ async function listShares(req, res) {
         total: result.total,
         page,
         limit,
-        rows
-      }
+        rows,
+      },
     });
   } catch (error) {
     logger.error('Admin listShares error:', error);
@@ -88,7 +90,8 @@ async function deleteShare(req, res) {
       action: 'admin.deleteShare',
       target: id,
       actorIp: req.ip,
-      detail: { deleted: true }
+      userAgent: req.get('user-agent'),
+      detail: { deleted: true },
     });
     logger.info(`Admin deleted share: ${id}`);
     res.json({ success: true });
@@ -114,7 +117,7 @@ async function deleteBatch(req, res) {
       return res.status(400).json({ success: false, error: '单次最多删除 200 条记录' });
     }
 
-    const validIds = ids.filter(id => typeof id === 'string' && /^[a-zA-Z0-9]+$/.test(id));
+    const validIds = ids.filter((id) => typeof id === 'string' && /^[a-zA-Z0-9]+$/.test(id));
 
     const deleted = shareTextModel.deleteShareTextsByIds(validIds);
     cache.delMultiple(validIds);
@@ -122,11 +125,12 @@ async function deleteBatch(req, res) {
       action: 'admin.deleteBatch',
       target: 'share_text',
       actorIp: req.ip,
+      userAgent: req.get('user-agent'),
       detail: {
         requestedIds: ids.length,
         validIds,
-        deleted
-      }
+        deleted,
+      },
     });
 
     logger.info(`Admin batch deleted ${deleted} shares`);
@@ -154,10 +158,13 @@ async function cleanupExpired(req, res) {
       action: 'admin.cleanupExpired',
       target: 'expired_records',
       actorIp: req.ip,
+      userAgent: req.get('user-agent'),
       detail: {
         deleted,
-        expiredIds
-      }
+        // 仅记录数量与少量样本，避免 audit_log 单条过大
+        expiredCount: expiredIds.length,
+        sampleIds: expiredIds.slice(0, 10),
+      },
     });
 
     logger.info(`Admin cleanup: ${deleted} expired records deleted`);
@@ -174,5 +181,5 @@ module.exports = {
   listShares,
   deleteShare,
   deleteBatch,
-  cleanupExpired
+  cleanupExpired,
 };

@@ -1,44 +1,40 @@
-const fs = require('fs');
+/**
+ * 模型持久化测试
+ * 验证 better-sqlite3 的增量写入特性：写操作即时落盘，无需显式 flush
+ */
+
+const Database = require('better-sqlite3');
 const path = require('path');
-const initSqlJs = require('sql.js');
 
 const shareTextModel = require('../src/server/models/shareText');
 
 const dbPath = path.join(__dirname, '../src/server/db/data/share_text.db');
 
-async function readPersistedViewCount(id) {
-  const SQL = await initSqlJs();
-  const fileBuffer = fs.readFileSync(dbPath);
-  const persistedDb = new SQL.Database(fileBuffer);
-  const stmt = persistedDb.prepare('SELECT view_count FROM share_text WHERE id = ?');
-  stmt.bind([id]);
-
-  let viewCount = null;
-  if (stmt.step()) {
-    viewCount = stmt.getAsObject().view_count;
+function readPersistedViewCount(id) {
+  // 以只读方式打开同一数据库文件，验证数据已落盘
+  const roDb = new Database(dbPath, { readonly: true });
+  try {
+    const row = roDb.prepare('SELECT view_count FROM share_text WHERE id = ?').get(id);
+    return row ? row.view_count : null;
+  } finally {
+    roDb.close();
   }
-
-  stmt.free();
-  persistedDb.close();
-  return viewCount;
 }
 
 describe('shareText model persistence', () => {
-  beforeAll(async () => {
-    await shareTextModel.initDatabase();
+  beforeAll(() => {
+    shareTextModel.initDatabase();
   });
 
   afterEach(() => {
-    shareTextModel.flushPendingWrites();
     shareTextModel.deleteShareTextById('testFlushPendingWrites');
   });
 
-  test('flushPendingWrites persists debounced view count updates to disk', async () => {
+  test('incrementViewCount writes are immediately persisted to disk', () => {
     shareTextModel.createShareText('testFlushPendingWrites', 'flush me', null);
     shareTextModel.incrementViewCount('testFlushPendingWrites');
 
-    shareTextModel.flushPendingWrites();
-
-    await expect(readPersistedViewCount('testFlushPendingWrites')).resolves.toBe(1);
+    // better-sqlite3 同步写入，无需 flush，另一连接读取应得到最新值
+    expect(readPersistedViewCount('testFlushPendingWrites')).toBe(1);
   });
 });

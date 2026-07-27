@@ -1,16 +1,18 @@
 /**
  * Markdown 检测逻辑测试
- * 与 share.js 中 isMarkdown() 保持同步
+ *
+ * 直接复用 share.js 在浏览器中加载的同一份实现（markdownDetector.js），
+ * 杜绝源码与测试之间的逻辑漂移。
  */
 
-// 从 share.js 提取的 Markdown 检测正则（与源文件保持一致）
-const MARKDOWN_PATTERN = /(^\s{0,3}#{1,6}\s)|(```)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(\[.+?\]\(.+?\))|(^\s*>\s)|(^\s*\|.+\|\s*$)|(!\[.*?\]\(data:image\/)/m;
-
-function isMarkdown(text) {
-  return MARKDOWN_PATTERN.test(text);
-}
+const { isMarkdown, MARKDOWN_PATTERN } = require('../src/public/js/markdownDetector');
 
 describe('isMarkdown 检测逻辑', () => {
+  test('模块导出 isMarkdown 函数与 MARKDOWN_PATTERN 正则', () => {
+    expect(typeof isMarkdown).toBe('function');
+    expect(MARKDOWN_PATTERN).toBeInstanceOf(RegExp);
+  });
+
   describe('应识别为 Markdown', () => {
     test('ATX 标题 H1', () => {
       expect(isMarkdown('# 标题')).toBe(true);

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     target TEXT NOT NULL,
     detail TEXT,
     actor_ip TEXT,
+    user_agent TEXT,
     created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

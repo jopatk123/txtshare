@@ -8,8 +8,20 @@ npm-debug.log
 !README.md
 data/
 src/server/db/**/*.db
+src/server/db/**/*.db-wal
+src/server/db/**/*.db-shm
 src/server/logs/
 .DS_Store
 .vscode
 .idea
 *.log
+# 测试与配置文件不需要进入生产镜像
+tests/
+coverage/
+eslint.config.js
+jest.config.js
+.prettierrc.json
+.prettierignore
+.editorconfig
+.github/
+start.sh

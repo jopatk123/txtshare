@@ -1,8 +1,26 @@
 const crypto = require('crypto');
 const logger = require('./logger');
+const shareTextModel = require('../models/shareText');
 
 function hashTokenForComparison(token) {
   return crypto.createHash('sha256').update(token, 'utf8').digest();
+}
+
+/**
+ * 记录登录失败到审计日志（best-effort，不阻塞响应）
+ */
+function recordLoginFailure(req, reason) {
+  try {
+    shareTextModel.createAuditLog({
+      action: 'admin.loginFailed',
+      target: 'admin',
+      actorIp: req.ip,
+      userAgent: req.get('user-agent'),
+      detail: { reason },
+    });
+  } catch (error) {
+    logger.error('Failed to write login failure audit log:', error);
+  }
 }
 
 /**
@@ -16,7 +34,7 @@ function adminAuth(req, res, next) {
   if (!adminToken) {
     return res.status(503).json({
       success: false,
-      error: '管理员功能未启用，请配置 ADMIN_TOKEN 环境变量'
+      error: '管理员功能未启用，请配置 ADMIN_TOKEN 环境变量',
     });
   }
 
@@ -30,9 +48,10 @@ function adminAuth(req, res, next) {
   }
 
   if (!requestToken) {
+    recordLoginFailure(req, 'missing_token');
     return res.status(401).json({
       success: false,
-      error: '未提供认证令牌'
+      error: '未提供认证令牌',
     });
   }
 
@@ -45,15 +64,17 @@ function adminAuth(req, res, next) {
 
     if (!valid) {
       logger.warn(`Admin auth failed from IP: ${req.ip}`);
+      recordLoginFailure(req, 'invalid_token');
       return res.status(401).json({
         success: false,
-        error: '认证令牌无效'
+        error: '认证令牌无效',
       });
     }
   } catch {
+    recordLoginFailure(req, 'comparison_error');
     return res.status(401).json({
       success: false,
-      error: '认证令牌无效'
+      error: '认证令牌无效',
     });
   }
 

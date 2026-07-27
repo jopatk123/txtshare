@@ -14,7 +14,7 @@
 ## 技术栈
 
 - **后端**: Node.js + Express
-- **数据库**: SQLite (sql.js)
+- **数据库**: SQLite (better-sqlite3，WAL 模式)
 - **缓存**: node-cache
 - **定时任务**: node-schedule
 - **日志**: winston
@@ -96,8 +96,8 @@ docker run -d \
 - 管理员 token 先做固定长度摘要再走 `crypto.timingSafeEqual` 比对，避免长度侧信道；后台页面默认不持久化令牌。
 - 后台敏感操作（单删 / 批删 / 清理过期）会写入 `audit_log` 审计表，并可通过 `/api/admin/audit-logs` 查看最近记录。
 - 公开 / 创建 / 分享页 / 管理接口采用分层限流，避免通过页面路由绕过 API 限制。
-- sql.js 落盘采用「临时文件 + fsync + rename」原子替换，避免半写损坏整库。
-- Docker 镜像以 `node` 非 root 用户运行，并启用 `npm ci --omit=dev` 走锁文件构建。
+- better-sqlite3 启用 WAL 模式，写入即时落盘，无需应用层全量 export+fsync；事务保证原子性。
+- Docker 镜像采用多阶段构建，以 `node` 非 root 用户运行，`npm ci --omit=dev` 走锁文件，并启用运行时加固（`read_only` / `cap_drop: ALL` / `no-new-privileges`）。
 
 ## Nginx 配置
 

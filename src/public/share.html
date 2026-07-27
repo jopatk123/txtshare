@@ -1,62 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex, nofollow">
-  <title>查看分享 - TextShare</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/github-markdown.css">
-  <link rel="stylesheet" href="/css/github.min.css">
-  <link rel="stylesheet" href="/css/share-markdown.css">
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-</head>
-<body>
-  <div class="container">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>查看分享 - TextShare</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/github-markdown.css" />
+    <link rel="stylesheet" href="/css/github.min.css" />
+    <link rel="stylesheet" href="/css/share-markdown.css" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- 加载状态 -->
+      <div class="loading show" id="loading">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
 
-    <!-- 加载状态 -->
-    <div class="loading show" id="loading">
-      <div class="spinner"></div>
-      <p>加载中...</p>
+      <!-- 内容区域 -->
+      <main class="card" id="content" style="display: none">
+        <div class="form-group">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <span></span>
+            <button
+              type="button"
+              id="copyBtn"
+              class="btn btn-secondary"
+              style="padding: 8px 16px; font-size: 13px"
+            >
+              📋 复制内容
+            </button>
+          </div>
+          <div id="textContent" style="min-height: 100px"></div>
+        </div>
+
+        <div class="meta-info">
+          <div class="meta-item">
+            <span>🕐 创建时间：</span>
+            <span id="createTime">-</span>
+          </div>
+          <div class="meta-item">
+            <span>⏰ 过期时间：</span>
+            <span id="expireTime">-</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center">
+          <a href="/" class="btn btn-primary">创建新分享</a>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <p>© 2026 TextShare - 轻量级文本分享工具</p>
+      </footer>
     </div>
 
-    <!-- 内容区域 -->
-    <main class="card" id="content" style="display: none;">
-      <div class="form-group">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <span></span>
-          <button type="button" id="copyBtn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
-            📋 复制内容
-          </button>
-        </div>
-        <div id="textContent" style="min-height: 100px;"></div>
-      </div>
-
-      <div class="meta-info">
-        <div class="meta-item">
-          <span>🕐 创建时间：</span>
-          <span id="createTime">-</span>
-        </div>
-        <div class="meta-item">
-          <span>⏰ 过期时间：</span>
-          <span id="expireTime">-</span>
-        </div>
-      </div>
-
-      <div style="margin-top: 20px; text-align: center;">
-        <a href="/" class="btn btn-primary">创建新分享</a>
-      </div>
-    </main>
-
-    <footer class="footer">
-      <p>© 2026 TextShare - 轻量级文本分享工具</p>
-    </footer>
-  </div>
-
-  <script src="/js/vendor/marked.min.js"></script>
-  <script src="/js/vendor/purify.min.js"></script>
-  <script src="/js/vendor/highlight.min.js"></script>
-  <script src="/js/common.js"></script>
-  <script src="/js/share.js"></script>
-</body>
+    <!-- vendor 脚本本地托管（供应链可控），并附加 SRI：文件被篡改时浏览器将拒绝执行 -->
+    <!-- defer 保证解析并行、执行有序；share.js 依赖 marked/DOMPurify/hljs 与 common.js -->
+    <script
+      src="/js/vendor/marked.min.js"
+      integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script
+      src="/js/vendor/purify.min.js"
+      integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script
+      src="/js/vendor/highlight.min.js"
+      integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="/js/common.js" defer></script>
+    <script src="/js/markdownDetector.js" defer></script>
+    <script src="/js/share.js" defer></script>
+  </body>
 </html>

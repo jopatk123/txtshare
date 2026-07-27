@@ -38,36 +38,32 @@ const logger = winston.createLogger({
       filename: path.join(logDir, 'error.log'),
       level: 'error',
       maxsize: 5 * 1024 * 1024, // 5MB
-      maxFiles: 5
+      maxFiles: 5,
     }),
     // 综合日志
     new winston.transports.File({
       filename: path.join(logDir, 'combined.log'),
       maxsize: 10 * 1024 * 1024, // 10MB
-      maxFiles: 5
+      maxFiles: 5,
     }),
     // 定时任务日志（仅记录包含 cleanup/scheduler 关键词的日志）
     new winston.transports.File({
       filename: path.join(logDir, 'scheduler.log'),
       level: 'info',
-      format: winston.format.combine(
-        schedulerFilter(),
-        logFormat
-      ),
+      format: winston.format.combine(schedulerFilter(), logFormat),
       maxsize: 5 * 1024 * 1024, // 5MB
-      maxFiles: 3
-    })
-  ]
+      maxFiles: 3,
+    }),
+  ],
 });
 
 // 测试环境以外都输出到控制台，便于 docker logs / 进程管理器直接采集。
 if (process.env.NODE_ENV !== 'test') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      logFormat
-    )
-  }));
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.combine(winston.format.colorize(), logFormat),
+    })
+  );
 }
 
 module.exports = logger;

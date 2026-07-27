@@ -21,7 +21,6 @@ router.get('/:id', sharePageLimiter, (req, res) => {
 
     // 返回分享页面
     res.sendFile(path.join(__dirname, '../../public/share.html'));
-
   } catch (error) {
     logger.error('Share page error:', error);
     res.sendFile(path.join(__dirname, '../../public/expired.html'));

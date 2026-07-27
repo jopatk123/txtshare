@@ -13,6 +13,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=6006
+      # 容器时区与用户时区保持一致，避免日志与时间显示错位
+      - TZ=Asia/Shanghai
       # 可选：设置对外访问的完整地址，例如 https://your-domain.example
       - BASE_URL=${BASE_URL:-}
       # 默认不信任转发头；仅在前面有一层受信任反向代理时设置为 1 或对应策略
@@ -21,3 +23,11 @@ services:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
       # CORS 白名单：未设置时仍允许任意源；推荐生产环境显式配置
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+    # 运行时加固
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

@@ -65,5 +65,5 @@ module.exports = {
   getConfiguredBaseUrl,
   getRequestBaseUrl,
   normalizeBaseUrl,
-  warnIfBaseUrlMissing
+  warnIfBaseUrlMissing,
 };

@@ -1,8 +1,9 @@
 /**
  * 分享页面脚本
  */
+/* global formatDateTime, showToast, fallbackCopy, isMarkdown */
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
   const loadingEl = document.getElementById('loading');
   const contentEl = document.getElementById('content');
   const textContentEl = document.getElementById('textContent');
@@ -42,16 +43,16 @@ document.addEventListener('DOMContentLoaded', async function() {
       expireTimeEl.textContent = formatDateTime(data.data.expireTime);
 
       // 设置复制功能
-      copyBtn.addEventListener('click', function() {
+      copyBtn.addEventListener('click', function () {
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(rawContent)
+          navigator.clipboard
+            .writeText(rawContent)
             .then(() => showToast('内容已复制到剪贴板', 'success'))
             .catch(() => fallbackCopy(rawContent));
         } else {
           fallbackCopy(rawContent);
         }
       });
-
     } else {
       // 跳转到失效页面
       window.location.href = '/expired.html';
@@ -71,7 +72,7 @@ function renderContent(container, rawText) {
   if (isMarkdown(text) && window.marked && window.DOMPurify) {
     // 设置 Markdown 渲染容器样式
     container.className = 'markdown-body markdown-share-body';
-    
+
     // 渲染 Markdown
     const html = marked.parse(text, { breaks: true });
     // 配置 DOMPurify 允许 data: URL 的图片
@@ -80,14 +81,14 @@ function renderContent(container, rawText) {
       ADD_DATA_URI_TAGS: ['img'],
       ADD_ATTR: ['src', 'alt'],
     });
-    
+
     // 为内嵌图片添加响应式样式
     container.querySelectorAll('img').forEach((img) => {
       img.classList.add('shared-image');
       img.loading = 'lazy';
       img.decoding = 'async';
       // 点击图片放大查看
-      img.addEventListener('click', function() {
+      img.addEventListener('click', function () {
         openImageViewer(this.src);
       });
       img.style.cursor = 'zoom-in';
@@ -114,11 +115,11 @@ function openImageViewer(src) {
   // 创建遮罩层
   const overlay = document.createElement('div');
   overlay.className = 'image-viewer-overlay';
-  
+
   const img = document.createElement('img');
   img.src = src;
   img.className = 'image-viewer-img';
-  
+
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
@@ -128,7 +129,7 @@ function openImageViewer(src) {
   }
 
   // 点击遮罩关闭
-  overlay.addEventListener('click', function() {
+  overlay.addEventListener('click', function () {
     closeViewer();
   });
 
@@ -146,10 +147,10 @@ function openImageViewer(src) {
 
 /**
  * 简单判断文本是否为 Markdown（包含图片标记检测）
+ *
+ * 实现已抽离到 markdownDetector.js，share.js 通过 <script> 加载后
+ * window.isMarkdown / window.MARKDOWN_PATTERN 可用，避免与测试逻辑漂移。
  */
-function isMarkdown(text) {
-  return /(^\s{0,3}#{1,6}\s)|(```)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(\[.+?\]\(.+?\))|(^\s*>\s)|(^\s*\|.+\|\s*$)|(!\[.*?\]\(data:image\/)/m.test(text);
-}
 
 /**
  * 显示错误页面

@@ -208,7 +208,9 @@
   margin: 14px 0;
   border: 1px solid var(--md-border);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .markdown-body.markdown-share-body .shared-image:hover {

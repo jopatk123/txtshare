@@ -1,77 +1,67 @@
 /**
- * 验证 sql.js 模型在落盘过程中使用「临时文件 + rename」做原子替换，
- * 避免半写导致整库损坏。
+ * 验证 better-sqlite3 WAL 模式下的写入原子性与数据完整性。
+ *
+ * better-sqlite3 通过 SQLite 引擎自身的 WAL + 事务机制保证原子性，
+ * 不再需要应用层「临时文件 + rename」的兜底，本测试验证：
+ * 1. WAL 模式已启用
+ * 2. 写入后数据可被另一只读连接读取（数据已落盘到 WAL）
+ * 3. 写入失败时事务回滚，数据不被破坏
  */
 
-const fs = require('fs');
+const Database = require('better-sqlite3');
 const path = require('path');
 
-const dbFile = path.resolve(__dirname, '../src/server/db/data/share_text.db');
+const shareTextModel = require('../src/server/models/shareText');
 
-describe('Atomic database write', () => {
-  let shareTextModel;
-  let originalRename;
-  let originalUnlink;
+const dbPath = path.join(__dirname, '../src/server/db/data/share_text.db');
 
-  beforeAll(async () => {
-    shareTextModel = require('../src/server/models/shareText');
-    await shareTextModel.initDatabase();
+describe('better-sqlite3 WAL atomicity & integrity', () => {
+  beforeAll(() => {
+    shareTextModel.initDatabase();
   });
 
   afterEach(() => {
-    if (originalRename) fs.renameSync = originalRename;
-    if (originalUnlink) fs.unlinkSync = originalUnlink;
-    originalRename = null;
-    originalUnlink = null;
+    const db = shareTextModel.getDb();
+    db.exec("DELETE FROM share_text WHERE id LIKE 'atomic%'");
   });
 
-  test('writes to tmp file then renames into place', () => {
-    const tmpPath = `${dbFile}.tmp`;
-    let sawTmpBeforeRename = false;
-    let renamedTo = null;
+  test('WAL journal mode is enabled', () => {
+    const db = shareTextModel.getDb();
+    const row = db.pragma('journal_mode', { simple: true });
+    expect(row).toBe('wal');
+  });
 
-    originalRename = fs.renameSync;
-    fs.renameSync = (from, to) => {
-      if (from === tmpPath && to === dbFile) {
-        sawTmpBeforeRename = fs.existsSync(tmpPath);
-        renamedTo = to;
-      }
-      return originalRename.call(fs, from, to);
-    };
-
+  test('writes are visible to a separate read-only connection immediately', () => {
     const id = `atomic${Date.now().toString(36)}`;
     shareTextModel.createShareText(id, 'atomic-write-test', null);
 
-    expect(sawTmpBeforeRename).toBe(true);
-    expect(renamedTo).toBe(dbFile);
-    expect(fs.existsSync(dbFile)).toBe(true);
-    expect(fs.existsSync(tmpPath)).toBe(false);
-
-    // 清理
-    shareTextModel.deleteShareTextById(id);
+    const roDb = new Database(dbPath, { readonly: true });
+    try {
+      const row = roDb.prepare('SELECT id, content FROM share_text WHERE id = ?').get(id);
+      expect(row).toBeTruthy();
+      expect(row.id).toBe(id);
+      expect(row.content).toBe('atomic-write-test');
+    } finally {
+      roDb.close();
+    }
   });
 
-  test('rename failure leaves original db intact', () => {
-    const tmpPath = `${dbFile}.tmp`;
-    const originalSize = fs.statSync(dbFile).size;
+  test('transaction rollback on failure leaves prior data intact', () => {
+    const id = `atomicRollback${Date.now().toString(36)}`;
+    shareTextModel.createShareText(id, 'initial', null);
 
-    originalRename = fs.renameSync;
-    fs.renameSync = (from) => {
-      if (from === tmpPath) {
-        throw new Error('simulated rename failure');
-      }
-      return originalRename.apply(fs, arguments);
-    };
-
+    const db = shareTextModel.getDb();
+    // 在事务中故意抛错，验证回滚
     expect(() => {
-      shareTextModel.createShareText(`fail${Date.now().toString(36)}`, 'x', null);
-    }).toThrow(/simulated rename failure/);
+      const tx = db.transaction(() => {
+        db.prepare('UPDATE share_text SET content = ? WHERE id = ?').run('modified', id);
+        throw new Error('simulated failure');
+      });
+      tx();
+    }).toThrow(/simulated failure/);
 
-    // 原库未损坏，大小仍然合理
-    const finalSize = fs.statSync(dbFile).size;
-    expect(finalSize).toBe(originalSize);
-
-    // 清理可能残留的 tmp 文件
-    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    // 原数据未被修改
+    const row = shareTextModel.getShareTextById(id);
+    expect(row.content).toBe('initial');
   });
 });

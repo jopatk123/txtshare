@@ -24,7 +24,7 @@ describe('trust proxy parsing', () => {
     expect(parseTrustProxy('loopback, linklocal, uniquelocal')).toEqual([
       'loopback',
       'linklocal',
-      'uniquelocal'
+      'uniquelocal',
     ]);
   });
 

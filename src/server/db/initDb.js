@@ -1,50 +1,43 @@
-const initSqlJs = require('sql.js');
+/**
+ * 数据库初始化脚本（独立可执行）
+ *
+ * 使用 better-sqlite3 同步打开/创建数据库，启用 WAL 模式以提升并发读与写入吞吐。
+ * 用法：npm run init-db
+ */
+
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const dbDir = path.join(__dirname);
+const dbDir = __dirname;
 const dataDir = path.join(dbDir, 'data');
 const dbPath = path.join(dataDir, 'share_text.db');
 
-// 确保目录存在
+// 确保数据目录存在
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-async function initDatabase() {
-  // 如果数据库文件已存在，跳过初始化以防止数据丢失
+function initDatabase() {
+  // 已存在则跳过，避免覆盖数据
   if (fs.existsSync(dbPath)) {
-    console.log('数据库文件已存在，跳过初始化:', dbPath);
+    console.info('数据库文件已存在，跳过初始化:', dbPath);
     return;
   }
 
-  const SQL = await initSqlJs();
-  
-  // 创建新数据库
-  const db = new SQL.Database();
-  
-  // 读取初始化SQL
-  const initSql = fs.readFileSync(path.join(__dirname, 'init.sql'), 'utf8');
-  
-  // 执行初始化
-  db.run(initSql);
-  
-  // 保存到文件（原子写）
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  const tmpPath = `${dbPath}.tmp`;
-  const fd = fs.openSync(tmpPath, 'w');
+  const db = new Database(dbPath);
   try {
-    fs.writeSync(fd, buffer, 0, buffer.length, 0);
-    fs.fsyncSync(fd);
+    // 启用 WAL 模式，提升读写并发性能
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('foreign_keys = ON');
+
+    const initSql = fs.readFileSync(path.join(__dirname, 'init.sql'), 'utf8');
+    db.exec(initSql);
+    console.info('数据库初始化完成:', dbPath);
   } finally {
-    fs.closeSync(fd);
+    db.close();
   }
-  fs.renameSync(tmpPath, dbPath);
-  
-  console.log('数据库初始化完成:', dbPath);
-  
-  db.close();
 }
 
-initDatabase().catch(console.error);
+initDatabase();

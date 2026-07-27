@@ -1,202 +1,200 @@
-const initSqlJs = require('sql.js');
+/**
+ * 分享文本数据模型
+ *
+ * 基于 better-sqlite3 同步 API，启用 WAL 模式：
+ * - 增量写入，无需全量 export+fsync
+ * - prepared statements 复用
+ * - 同步事务保证原子性
+ */
+
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+
+// ── 路径与常量 ──────────────────────────────────────────────────────────────
 
 const dbDir = path.join(__dirname, '../db');
 const dataDir = path.join(dbDir, 'data');
 const dbPath = path.join(dataDir, 'share_text.db');
 
-// 确保目录存在
+// ID 碰撞重试次数（10 位 base62 碰撞概率极低，5 次足够兜底）
+const MAX_ID_RETRIES = 5;
+// 管理后台内容预览长度
+const CONTENT_PREVIEW_LENGTH = 120;
+// 分页参数上下限
+const MAX_PAGE_LIMIT = 100;
+const DEFAULT_PAGE_LIMIT = 20;
+// 审计日志查询上限
+const MAX_AUDIT_LOG_LIMIT = 100;
+const DEFAULT_AUDIT_LOG_LIMIT = 20;
+// 批量删除单次上限
+const MAX_BATCH_DELETE = 200;
+
+const EXPIRED_RECORDS_CONDITION =
+  "expire_time IS NOT NULL AND datetime(expire_time) < datetime('now')";
+
+// 确保数据目录存在
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
+// ── 数据库实例与 prepared statements ─────────────────────────────────────────
+
 let db = null;
-let _saveTimer = null;
-const EXPIRED_RECORDS_CONDITION = "expire_time IS NOT NULL AND datetime(expire_time) < datetime('now')";
-const AUDIT_LOG_INIT_SQL = `
-  CREATE TABLE IF NOT EXISTS audit_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    action TEXT NOT NULL,
-    target TEXT NOT NULL,
-    detail TEXT,
-    actor_ip TEXT,
-    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE INDEX IF NOT EXISTS idx_audit_log_created_time ON audit_log(created_time DESC);
-`;
+let stmts = null;
 
 /**
- * 初始化数据库
+ * 轻量迁移：为旧库的 audit_log 补充 user_agent 列
+ * better-sqlite3 可通过 pragma table_info 检查列是否存在
  */
-async function initDatabase() {
-  if (db) return db;
-  
-  const SQL = await initSqlJs();
-  
-  // 如果数据库文件存在，加载它
-  if (fs.existsSync(dbPath)) {
-    const fileBuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
-    // 执行初始化SQL
-    const initSql = fs.readFileSync(path.join(dbDir, 'init.sql'), 'utf8');
-    db.run(initSql);
+function migrateAuditLogUserAgent(database) {
+  const columns = database.pragma('table_info(audit_log)');
+  const hasUserAgent = columns.some((col) => col.name === 'user_agent');
+  if (!hasUserAgent) {
+    database.exec('ALTER TABLE audit_log ADD COLUMN user_agent TEXT');
   }
+}
 
-  db.run(AUDIT_LOG_INIT_SQL);
-  saveDatabase();
-  
+/**
+ * 初始化数据库连接并预编译 statements
+ */
+function initDatabase() {
+  if (db) return db;
+
+  db = new Database(dbPath);
+  // WAL 提升读写并发；NORMAL 同步级别在 WAL 下不会损坏数据
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('foreign_keys = ON');
+
+  // 加载 schema（IF NOT EXISTS，安全幂等）
+  const initSql = fs.readFileSync(path.join(dbDir, 'init.sql'), 'utf8');
+  db.exec(initSql);
+
+  // 轻量迁移：为旧库的 audit_log 补充 user_agent 列
+  migrateAuditLogUserAgent(db);
+
+  // 预编译常用 statements，避免每次调用重新解析 SQL
+  stmts = {
+    insertShare: db.prepare(`
+      INSERT INTO share_text (id, content, expire_time)
+      VALUES (?, ?, ?)
+    `),
+    getById: db.prepare(`
+      SELECT id, content, create_time, expire_time, view_count
+      FROM share_text
+      WHERE id = ?
+    `),
+    incrementView: db.prepare('UPDATE share_text SET view_count = view_count + 1 WHERE id = ?'),
+    deleteExpired: db.prepare(`DELETE FROM share_text WHERE ${EXPIRED_RECORDS_CONDITION}`),
+    selectExpiredIds: db.prepare(`SELECT id FROM share_text WHERE ${EXPIRED_RECORDS_CONDITION}`),
+    deleteById: db.prepare('DELETE FROM share_text WHERE id = ?'),
+    countAll: db.prepare('SELECT COUNT(*) AS total FROM share_text'),
+    countSearch: db.prepare('SELECT COUNT(*) AS total FROM share_text WHERE id LIKE ?'),
+    statsTotal: db.prepare(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(view_count), 0) AS total_views FROM share_text'
+    ),
+    statsExpired: db.prepare(
+      `SELECT COUNT(*) AS expired FROM share_text WHERE ${EXPIRED_RECORDS_CONDITION}`
+    ),
+    statsNeverExpire: db.prepare(
+      'SELECT COUNT(*) AS never_expire FROM share_text WHERE expire_time IS NULL'
+    ),
+    insertAudit: db.prepare(`
+      INSERT INTO audit_log (action, target, detail, actor_ip, user_agent)
+      VALUES (?, ?, ?, ?, ?)
+    `),
+    selectAudit: db.prepare(`
+      SELECT id, action, target, detail, actor_ip, user_agent, created_time
+      FROM audit_log
+      ORDER BY id DESC
+      LIMIT ?
+    `),
+  };
+
   return db;
 }
 
 /**
- * 保存数据库到文件（立即保存，用于关键操作）
- *
- * 使用临时文件 + fsync + rename 进行原子替换，避免半写损坏整库：
- * 1. 写入同目录下的 .tmp 文件
- * 2. fsync 确保数据落盘
- * 3. rename 原子替换，保证读取方要么看到旧库要么看到新库
- */
-function saveDatabase() {
-  if (!db) return;
-
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  const tmpPath = `${dbPath}.tmp`;
-
-  const fd = fs.openSync(tmpPath, 'w');
-  try {
-    fs.writeSync(fd, buffer, 0, buffer.length, 0);
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-
-  fs.renameSync(tmpPath, dbPath);
-}
-
-/**
- * 延迟保存数据库到文件（用于非关键操作如 viewCount 更新，减少 I/O 压力）
- * 多次调用会合并为一次写入，延迟 2 秒
- */
-function saveDatabaseDebounced() {
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
-    saveDatabase();
-    _saveTimer = null;
-  }, 2000);
-}
-
-/**
- * 立即写出所有待落盘的数据
- */
-function flushPendingWrites() {
-  if (_saveTimer) {
-    clearTimeout(_saveTimer);
-    _saveTimer = null;
-  }
-
-  saveDatabase();
-}
-
-/**
- * 获取数据库实例（同步方法，用于已初始化后）
+ * 获取数据库实例（供测试/管理直接执行 SQL）
  */
 function getDb() {
   return db;
 }
 
 /**
+ * 关闭数据库连接（优雅关闭时调用）
+ */
+function closeDatabase() {
+  if (!db) return;
+  // WAL 模式下 checkpoint 保证数据落盘
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    // checkpoint 失败不阻塞关闭
+  }
+  db.close();
+  db = null;
+  stmts = null;
+}
+
+/**
+ * 兼容旧接口：better-sqlite3 同步写入，无需 flush
+ * 保留导出以避免破坏现有调用方与测试
+ */
+function flushPendingWrites() {
+  // no-op：所有写操作已即时落盘
+}
+
+// ── 业务方法 ─────────────────────────────────────────────────────────────────
+
+/**
  * 创建分享文本记录
  * @param {string} id - 唯一ID
  * @param {string} content - 文本内容
- * @param {Date|null} expireTime - 过期时间，null表示永不过期
+ * @param {Date|null} expireTime - 过期时间，null 表示永不过期
  */
 function createShareText(id, content, expireTime) {
-  const stmt = db.prepare(`
-    INSERT INTO share_text (id, content, expire_time)
-    VALUES (?, ?, ?)
-  `);
-  stmt.run([id, content, expireTime ? expireTime.toISOString() : null]);
-  stmt.free();
-  saveDatabase();
+  stmts.insertShare.run(id, content, expireTime ? expireTime.toISOString() : null);
 }
 
 /**
- * 根据ID获取分享文本
- * @param {string} id - 分享ID
- * @returns {Object|null} - 文本记录或null
+ * 根据 ID 获取分享文本
  */
 function getShareTextById(id) {
-  const stmt = db.prepare(`
-    SELECT id, content, create_time, expire_time, view_count
-    FROM share_text
-    WHERE id = ?
-  `);
-  stmt.bind([id]);
-  
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return row;
-  }
-  stmt.free();
-  return null;
+  return stmts.getById.get(id) || null;
 }
 
 /**
- * 增加访问次数
- * @param {string} id - 分享ID
+ * 增加访问次数（WAL 模式下写入开销极低）
  */
 function incrementViewCount(id) {
-  db.run(`UPDATE share_text SET view_count = view_count + 1 WHERE id = ?`, [id]);
-  saveDatabaseDebounced(); // 访问计数是非关键操作，使用延迟保存
+  stmts.incrementView.run(id);
 }
 
 /**
  * 删除过期记录
- * @returns {number} - 删除的记录数
+ * @returns {number} 删除的记录数
  */
 function deleteExpiredRecords() {
-  db.run(`
-    DELETE FROM share_text
-    WHERE ${EXPIRED_RECORDS_CONDITION}
-  `);
-  // 必须在 saveDatabase()（即 db.export()）之前读取，否则会被重置为 0
-  const affected = db.getRowsModified();
-  saveDatabase();
-  return affected;
+  const info = stmts.deleteExpired.run();
+  return info.changes;
 }
 
 /**
- * 获取所有过期记录的ID（用于清理缓存）
- * @returns {string[]} - 过期记录ID数组
+ * 获取所有过期记录的 ID（用于清理缓存）
+ * @returns {string[]}
  */
 function getExpiredIds() {
-  const results = [];
-  const stmt = db.prepare(`
-    SELECT id FROM share_text
-    WHERE ${EXPIRED_RECORDS_CONDITION}
-  `);
-  
-  while (stmt.step()) {
-    const row = stmt.getAsObject();
-    results.push(row.id);
-  }
-  stmt.free();
-  return results;
+  return stmts.selectExpiredIds.all().map((row) => row.id);
 }
 
 /**
  * 检查文本是否过期
- * @param {Object} record - 数据库记录
- * @returns {boolean} - 是否过期
  */
 function isExpired(record) {
   if (!record) return true;
-  if (!record.expire_time) return false; // null表示永不过期
+  if (!record.expire_time) return false;
   return new Date(record.expire_time) < new Date();
 }
 
@@ -205,133 +203,102 @@ function isExpired(record) {
  * @param {Object} options - { page, limit, search }
  * @returns {{ total: number, rows: Object[] }}
  */
-function getAllShareTexts({ page = 1, limit = 20, search = '' } = {}) {
-  const offset = (page - 1) * limit;
-  const params = [];
-  let whereClause = '';
+function getAllShareTexts({ page = 1, limit = DEFAULT_PAGE_LIMIT, search = '' } = {}) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(MAX_PAGE_LIMIT, Math.max(1, limit));
+  const offset = (safePage - 1) * safeLimit;
 
+  let total;
+  let rows;
   if (search && search.trim()) {
-    whereClause = ' WHERE id LIKE ?';
-    params.push(`%${search.trim()}%`);
+    const like = `%${search.trim()}%`;
+    total = stmts.countSearch.get(like).total;
+    rows = db
+      .prepare(
+        `SELECT id, substr(content, 1, ${CONTENT_PREVIEW_LENGTH}) AS content_preview,
+                create_time, expire_time, view_count
+         FROM share_text
+         WHERE id LIKE ?
+         ORDER BY create_time DESC
+         LIMIT ? OFFSET ?`
+      )
+      .all(like, safeLimit, offset);
+  } else {
+    total = stmts.countAll.get().total;
+    rows = db
+      .prepare(
+        `SELECT id, substr(content, 1, ${CONTENT_PREVIEW_LENGTH}) AS content_preview,
+                create_time, expire_time, view_count
+         FROM share_text
+         ORDER BY create_time DESC
+         LIMIT ? OFFSET ?`
+      )
+      .all(safeLimit, offset);
   }
-
-  const countStmt = db.prepare(`SELECT COUNT(*) as total FROM share_text${whereClause}`);
-  if (params.length > 0) countStmt.bind(params);
-  let total = 0;
-  if (countStmt.step()) {
-    total = countStmt.getAsObject().total;
-  }
-  countStmt.free();
-
-  const dataStmt = db.prepare(
-    `SELECT id, substr(content, 1, 120) as content_preview, create_time, expire_time, view_count
-     FROM share_text${whereClause}
-     ORDER BY create_time DESC LIMIT ? OFFSET ?`
-  );
-  dataStmt.bind([...params, limit, offset]);
-
-  const rows = [];
-  while (dataStmt.step()) {
-    rows.push(dataStmt.getAsObject());
-  }
-  dataStmt.free();
 
   return { total, rows };
 }
 
 /**
- * 根据ID删除单条记录
- * @param {string} id - 分享ID
- * @returns {boolean} - 是否删除成功
+ * 根据 ID 删除单条记录
  */
 function deleteShareTextById(id) {
-  db.run('DELETE FROM share_text WHERE id = ?', [id]);
-  const affected = db.getRowsModified();
-  if (affected > 0) saveDatabase();
-  return affected > 0;
+  const info = stmts.deleteById.run(id);
+  return info.changes > 0;
 }
 
 /**
  * 批量删除记录
- * @param {string[]} ids - 分享ID数组
- * @returns {number} - 删除的记录数
+ * @param {string[]} ids
+ * @returns {number} 删除的记录数
  */
 function deleteShareTextsByIds(ids) {
   if (!ids || ids.length === 0) return 0;
+  if (ids.length > MAX_BATCH_DELETE) {
+    throw new Error(`单次最多删除 ${MAX_BATCH_DELETE} 条记录`);
+  }
   const placeholders = ids.map(() => '?').join(',');
-  db.run(`DELETE FROM share_text WHERE id IN (${placeholders})`, ids);
-  const affected = db.getRowsModified();
-  if (affected > 0) saveDatabase();
-  return affected;
+  const info = db.prepare(`DELETE FROM share_text WHERE id IN (${placeholders})`).run(...ids);
+  return info.changes;
 }
 
 /**
  * 获取数据库统计信息
- * @returns {{ total: number, totalViews: number, expired: number, neverExpire: number }}
  */
 function getStats() {
-  const totalStmt = db.prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(view_count), 0) as total_views FROM share_text'
-  );
-  let total = 0;
-  let totalViews = 0;
-  if (totalStmt.step()) {
-    const row = totalStmt.getAsObject();
-    total = row.total;
-    totalViews = row.total_views;
-  }
-  totalStmt.free();
-
-  const expiredStmt = db.prepare(
-    `SELECT COUNT(*) as expired FROM share_text
-      WHERE ${EXPIRED_RECORDS_CONDITION}`
-  );
-  let expired = 0;
-  if (expiredStmt.step()) {
-    expired = expiredStmt.getAsObject().expired;
-  }
-  expiredStmt.free();
-
-  const neverExpireStmt = db.prepare(
-    'SELECT COUNT(*) as never_expire FROM share_text WHERE expire_time IS NULL'
-  );
-  let neverExpire = 0;
-  if (neverExpireStmt.step()) {
-    neverExpire = neverExpireStmt.getAsObject().never_expire;
-  }
-  neverExpireStmt.free();
-
-  return { total, totalViews, expired, neverExpire };
+  const totalRow = stmts.statsTotal.get();
+  const expiredRow = stmts.statsExpired.get();
+  const neverRow = stmts.statsNeverExpire.get();
+  return {
+    total: totalRow.total,
+    totalViews: totalRow.total_views,
+    expired: expiredRow.expired,
+    neverExpire: neverRow.never_expire,
+  };
 }
 
-function createAuditLog({ action, target, detail = null, actorIp = null }) {
-  const stmt = db.prepare(`
-    INSERT INTO audit_log (action, target, detail, actor_ip)
-    VALUES (?, ?, ?, ?)
-  `);
-  stmt.run([
+/**
+ * 写入审计日志
+ */
+function createAuditLog({ action, target, detail = null, actorIp = null, userAgent = null }) {
+  stmts.insertAudit.run(
     action,
     target,
-    detail == null ? null : JSON.stringify(detail),
-    actorIp
-  ]);
-  stmt.free();
-  saveDatabase();
+    detail === null ? null : JSON.stringify(detail),
+    actorIp,
+    userAgent
+  );
 }
 
-function getAuditLogs({ limit = 20 } = {}) {
-  const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-  const stmt = db.prepare(`
-    SELECT id, action, target, detail, actor_ip, created_time
-    FROM audit_log
-    ORDER BY id DESC
-    LIMIT ?
-  `);
-  stmt.bind([safeLimit]);
-
-  const rows = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject();
+/**
+ * 查询审计日志
+ */
+function getAuditLogs({ limit = DEFAULT_AUDIT_LOG_LIMIT } = {}) {
+  const safeLimit = Math.min(
+    MAX_AUDIT_LOG_LIMIT,
+    Math.max(1, parseInt(limit, 10) || DEFAULT_AUDIT_LOG_LIMIT)
+  );
+  return stmts.selectAudit.all(safeLimit).map((row) => {
     let detail = null;
     if (row.detail) {
       try {
@@ -340,22 +307,22 @@ function getAuditLogs({ limit = 20 } = {}) {
         detail = row.detail;
       }
     }
-    rows.push({
+    return {
       id: row.id,
       action: row.action,
       target: row.target,
       detail,
       actorIp: row.actor_ip,
-      createdTime: row.created_time
-    });
-  }
-  stmt.free();
-  return rows;
+      userAgent: row.user_agent,
+      createdTime: row.created_time,
+    };
+  });
 }
 
 module.exports = {
   initDatabase,
   getDb,
+  closeDatabase,
   flushPendingWrites,
   createShareText,
   getShareTextById,
@@ -368,5 +335,11 @@ module.exports = {
   deleteShareTextsByIds,
   getStats,
   createAuditLog,
-  getAuditLogs
+  getAuditLogs,
+  // 暴露常量供测试与外部使用
+  MAX_BATCH_DELETE,
+  MAX_ID_RETRIES,
+  CONTENT_PREVIEW_LENGTH,
+  MAX_PAGE_LIMIT,
+  DEFAULT_PAGE_LIMIT,
 };

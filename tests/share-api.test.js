@@ -12,13 +12,13 @@ const originalPort = process.env.PORT;
 
 let app;
 beforeAll(async () => {
-  await shareTextModel.initDatabase();
+  shareTextModel.initDatabase();
   app = require('../src/server/app');
 });
 
 afterEach(() => {
   const db = shareTextModel.getDb();
-  db.run("DELETE FROM share_text WHERE id LIKE 'test%'");
+  db.exec("DELETE FROM share_text WHERE id LIKE 'test%'");
   cache.flush();
   if (originalBaseUrl === undefined) delete process.env.BASE_URL;
   else process.env.BASE_URL = originalBaseUrl;
@@ -81,18 +81,14 @@ describe('POST /api/create', () => {
   });
 
   test('缺少 content 字段返回 400', async () => {
-    const res = await request(app)
-      .post('/api/create')
-      .send({ expireType: 'never' });
+    const res = await request(app).post('/api/create').send({ expireType: 'never' });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
   test('空字符串 content 返回 400', async () => {
-    const res = await request(app)
-      .post('/api/create')
-      .send({ content: '', expireType: 'never' });
+    const res = await request(app).post('/api/create').send({ content: '', expireType: 'never' });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -144,9 +140,7 @@ describe('POST /api/create', () => {
   });
 
   test('未提供 expireType 时默认永不过期', async () => {
-    const res = await request(app)
-      .post('/api/create')
-      .send({ content: '无过期字段' });
+    const res = await request(app).post('/api/create').send({ content: '无过期字段' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.expireTime).toBeNull();
@@ -217,11 +211,7 @@ describe('GET /api/text/:id', () => {
   });
 
   test('已过期的分享返回 410', async () => {
-    shareTextModel.createShareText(
-      'testExpR001',
-      '过期内容',
-      new Date(Date.now() - 1000),
-    );
+    shareTextModel.createShareText('testExpR001', '过期内容', new Date(Date.now() - 1000));
 
     const res = await request(app).get('/api/text/testExpR001');
 
@@ -256,7 +246,7 @@ describe('GET /api/text/:id', () => {
     await request(app).get(`/api/text/${id}`);
     await request(app).get(`/api/text/${id}`);
 
-    shareTextModel.flushPendingWrites();
+    // better-sqlite3 同步写入，无需 flush
     const record = shareTextModel.getShareTextById(id);
     expect(record.view_count).toBeGreaterThanOrEqual(2);
   });
@@ -286,9 +276,7 @@ describe('未知 API 路径', () => {
   });
 
   test('POST /api/unknown 同样返回 JSON 404', async () => {
-    const res = await request(app)
-      .post('/api/no-such-route')
-      .send({});
+    const res = await request(app).post('/api/no-such-route').send({});
 
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);

@@ -2,16 +2,17 @@
  * 图片智能压缩工具
  * 支持粘贴/拖拽图片，自动判断并压缩
  */
+/* exported ImageCompressor */
 
-const ImageCompressor = (function() {
+const ImageCompressor = (function () {
   // 配置常量
   const CONFIG = {
-    MAX_WIDTH: 1920,           // 最大宽度
-    MAX_HEIGHT: 1080,          // 最大高度
+    MAX_WIDTH: 1920, // 最大宽度
+    MAX_HEIGHT: 1080, // 最大高度
     MAX_FILE_SIZE: 500 * 1024, // 单张图片最大 500KB（压缩后）
-    INITIAL_QUALITY: 0.85,     // 初始 JPEG 质量
-    MIN_QUALITY: 0.3,          // 最低 JPEG 质量
-    QUALITY_STEP: 0.05,        // 每次降低的质量步长
+    INITIAL_QUALITY: 0.85, // 初始 JPEG 质量
+    MIN_QUALITY: 0.3, // 最低 JPEG 质量
+    QUALITY_STEP: 0.05, // 每次降低的质量步长
     SUPPORTED_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'],
   };
 
@@ -57,13 +58,13 @@ const ImageCompressor = (function() {
   function loadImage(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = function (e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
           resolve({
             img,
             originalSize: file.size,
-            type: file.type
+            type: file.type,
           });
         };
         img.onerror = () => reject(new Error('图片加载失败'));
@@ -87,14 +88,14 @@ const ImageCompressor = (function() {
       const sampleHeight = Math.min(canvas.height, 100);
       const imageData = ctx.getImageData(0, 0, sampleSize, sampleHeight);
       const data = imageData.data;
-      
+
       for (let i = 3; i < data.length; i += 4) {
         if (data[i] < 255) {
           return true;
         }
       }
       return false;
-    } catch (e) {
+    } catch (_e) {
       return false;
     }
   }
@@ -131,7 +132,7 @@ const ImageCompressor = (function() {
     const base64 = dataUrl.split(',')[1];
     if (!base64) return 0;
     // base64 编码后大小约为原始的 4/3
-    return Math.round(base64.length * 3 / 4);
+    return Math.round((base64.length * 3) / 4);
   }
 
   /**
@@ -169,7 +170,8 @@ const ImageCompressor = (function() {
     ctx.drawImage(img, 0, 0, width, height);
 
     // 3. 判断是否需要保留透明通道
-    const isTransparent = (type === 'image/png' || type === 'image/webp') && hasTransparency(canvas, ctx);
+    const isTransparent =
+      (type === 'image/png' || type === 'image/webp') && hasTransparency(canvas, ctx);
 
     // 4. 选择输出格式
     let outputFormat = 'image/jpeg';
@@ -207,12 +209,15 @@ const ImageCompressor = (function() {
         quality = Math.max(quality, CONFIG.MIN_QUALITY);
         dataUrl = canvas.toDataURL('image/jpeg', quality);
         compressedSize = getBase64Size(dataUrl);
-        onProgress?.(`压缩中... 质量: ${Math.round(quality * 100)}%, 大小: ${formatSize(compressedSize)}`);
+        onProgress?.(
+          `压缩中... 质量: ${Math.round(quality * 100)}%, 大小: ${formatSize(compressedSize)}`
+        );
       }
     }
 
     compressedSize = getBase64Size(dataUrl);
-    const compressionRatio = originalSize > 0 ? ((1 - compressedSize / originalSize) * 100).toFixed(1) : 0;
+    const compressionRatio =
+      originalSize > 0 ? ((1 - compressedSize / originalSize) * 100).toFixed(1) : 0;
 
     const info = {
       originalSize,
@@ -226,7 +231,9 @@ const ImageCompressor = (function() {
       wasResized: needsResize,
     };
 
-    onProgress?.(`压缩完成: ${formatSize(originalSize)} → ${formatSize(compressedSize)} (节省 ${compressionRatio}%)`);
+    onProgress?.(
+      `压缩完成: ${formatSize(originalSize)} → ${formatSize(compressedSize)} (节省 ${compressionRatio}%)`
+    );
 
     return { dataUrl, info };
   }

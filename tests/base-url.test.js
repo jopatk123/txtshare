@@ -1,4 +1,9 @@
-const { getConfiguredBaseUrl, getRequestBaseUrl, normalizeBaseUrl, warnIfBaseUrlMissing } = require('../src/server/utils/baseUrl');
+const {
+  getConfiguredBaseUrl,
+  getRequestBaseUrl,
+  normalizeBaseUrl,
+  warnIfBaseUrlMissing,
+} = require('../src/server/utils/baseUrl');
 
 describe('baseUrl utility', () => {
   const originalBaseUrl = process.env.BASE_URL;
@@ -42,7 +47,9 @@ describe('baseUrl utility', () => {
 
   test('uses explicit BASE_URL for request base url', () => {
     process.env.BASE_URL = 'https://example.com/';
-    expect(getRequestBaseUrl({ protocol: 'http', get: () => 'ignored' }, 6006)).toBe('https://example.com');
+    expect(getRequestBaseUrl({ protocol: 'http', get: () => 'ignored' }, 6006)).toBe(
+      'https://example.com'
+    );
   });
 
   test('derives request base url from Host header in non-production', () => {
@@ -53,7 +60,7 @@ describe('baseUrl utility', () => {
       get: (headerName) => {
         expect(headerName).toBe('host');
         return 'share.example.com';
-      }
+      },
     };
 
     expect(getRequestBaseUrl(req, 6006)).toBe('https://share.example.com');
@@ -64,7 +71,7 @@ describe('baseUrl utility', () => {
     process.env.NODE_ENV = 'production';
     const req = {
       protocol: 'https',
-      get: () => 'attacker.example.com'
+      get: () => 'attacker.example.com',
     };
 
     expect(getRequestBaseUrl(req, 6006)).toBe('http://localhost:6006');
@@ -76,7 +83,7 @@ describe('baseUrl utility', () => {
     process.env.PORT = '7001';
     const req = {
       protocol: 'https',
-      get: () => 'attacker.example.com'
+      get: () => 'attacker.example.com',
     };
 
     expect(getRequestBaseUrl(req)).toBe('http://localhost:7001');

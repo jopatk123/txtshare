@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # better-sqlite3 等原生依赖需要构建工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 make g++
+          npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npx prettier --check "src/**/*.{js,css,html}" "tests/**/*.js" "*.{js,json,md}"
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  docker-build:
+    name: Docker Build Smoke Test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t text-share:ci .
