@@ -23,13 +23,12 @@ WORKDIR /app
 # 生产环境标志
 ENV NODE_ENV=production
 
-# 仅复制生产依赖
-COPY package*.json ./
-RUN npm ci --omit=dev && \
-    npm cache clean --force
+# 从 builder 复制 package.json 和已编译的 node_modules（包含 native 模块）
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 
-# 复制源代码
-COPY --from=builder /app/src ./src
+# 从源代码复制 src 目录
+COPY src ./src
 
 # 创建必要目录并将所有权交给 node 用户
 RUN mkdir -p src/server/db/data src/server/logs && \
