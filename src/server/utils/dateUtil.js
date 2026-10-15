@@ -56,6 +56,25 @@ function formatDateTime(date) {
 }
 
 /**
+ * 将数据库时间统一成 UTC 的 ISO-8601。
+ *
+ * SQLite CURRENT_TIMESTAMP 写成 `YYYY-MM-DD HH:MM:SS`，且不含时区。
+ * JavaScript 会把这种字符串当成本地时间，非 UTC 时区下创建时间会整体偏移。
+ * 已带 `T` 或时区标记的值保持原样。
+ * @param {string|null|undefined} value
+ * @returns {string|null|undefined}
+ */
+function normalizeDbTimestamp(value) {
+  if (value === null || value === undefined || value === '') return value;
+  if (typeof value !== 'string') return value;
+
+  const match = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(\.\d+)?$/.exec(value);
+  if (!match) return value;
+
+  return `${match[1]}T${match[2]}${match[3] || ''}Z`;
+}
+
+/**
  * 计算缓存TTL（秒）
  * @param {Date|string|null} expireTime - 过期时间
  * @returns {number} - 缓存TTL秒数，0表示无限期
@@ -76,4 +95,5 @@ module.exports = {
   calculateExpireTime,
   formatDateTime,
   calculateCacheTTL,
+  normalizeDbTimestamp,
 };

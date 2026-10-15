@@ -7,6 +7,7 @@ const {
   calculateExpireTime,
   formatDateTime,
   calculateCacheTTL,
+  normalizeDbTimestamp,
 } = require('../src/server/utils/dateUtil');
 
 // ── calculateExpireTime ───────────────────────────────────────────────────────
@@ -140,5 +141,27 @@ describe('calculateCacheTTL', () => {
   test('ISO 字符串（过去）返回 -1', () => {
     const past = new Date(Date.now() - 5000).toISOString();
     expect(calculateCacheTTL(past)).toBe(-1);
+  });
+});
+
+describe('normalizeDbTimestamp', () => {
+  test('SQLite CURRENT_TIMESTAMP 被标成 UTC，避免按本地时区解析', () => {
+    expect(normalizeDbTimestamp('2026-10-15 07:46:00')).toBe('2026-10-15T07:46:00Z');
+    expect(new Date('2026-10-15T07:46:00Z').toISOString()).toBe('2026-10-15T07:46:00.000Z');
+  });
+
+  test('带小数秒的 SQLite 时间同样补上 Z', () => {
+    expect(normalizeDbTimestamp('2026-10-15 07:46:00.123')).toBe('2026-10-15T07:46:00.123Z');
+  });
+
+  test('已经是 ISO 的值保持不变', () => {
+    const iso = '2026-10-15T07:46:00.000Z';
+    expect(normalizeDbTimestamp(iso)).toBe(iso);
+  });
+
+  test('空值原样返回', () => {
+    expect(normalizeDbTimestamp(null)).toBeNull();
+    expect(normalizeDbTimestamp(undefined)).toBeUndefined();
+    expect(normalizeDbTimestamp('')).toBe('');
   });
 });

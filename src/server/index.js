@@ -26,6 +26,16 @@ function runCleanupTask() {
   } catch (error) {
     logger.error('Cleanup task error:', error);
   }
+
+  try {
+    const pruned = shareTextModel.pruneAuditLogs();
+    logger.info(
+      `Audit log cleanup completed: removed ${pruned.deletedByAge} by age, ${pruned.deletedByCap} by cap ` +
+        `(retentionDays=${pruned.retentionDays}, maxRows=${pruned.maxRows})`
+    );
+  } catch (error) {
+    logger.error('Audit log cleanup error:', error);
+  }
 }
 
 // 初始化数据库后启动服务器
@@ -49,7 +59,7 @@ function startServer() {
       warnIfBaseUrlMissing(logger);
     });
 
-    // 定时任务：每天凌晨 2 点清理过期数据
+    // 定时任务：每天凌晨 2 点清理过期分享和超量审计日志
     const cleanupJob = schedule.scheduleJob('0 2 * * *', runCleanupTask);
 
     shutdown = createShutdownHandler({

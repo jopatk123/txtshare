@@ -10,8 +10,8 @@ WORKDIR /app
 # 先复制依赖文件以利用层缓存
 COPY package*.json ./
 
-# 安装全部依赖（含 devDependencies，构建阶段需要）
-RUN npm ci
+# 只安装生产依赖。better-sqlite3 在这一步编译，运行镜像不再带构建工具和 devDependencies
+RUN npm ci --omit=dev
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 运行时镜像：仅包含生产依赖与源码
@@ -40,9 +40,10 @@ USER node
 # 暴露端口
 EXPOSE 6006
 
-# 健康检查（容器编排可据此判断实例存活）
+# 就绪探针：数据库或缓存不可用时 /api/health/ready 返回 503，fetch 失败则容器标记为 unhealthy。
+# /api/health 在降级时仍返回 200，不能用来判断能否接流量。
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:6006/api/health >/dev/null 2>&1 || exit 1
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||6006)+'/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # 启动应用
 CMD ["npm", "start"]

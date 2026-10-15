@@ -10,6 +10,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const { normalizeDbTimestamp } = require('../utils/dateUtil');
 
 // ── 路径与常量 ──────────────────────────────────────────────────────────────
 
@@ -27,6 +28,11 @@ const DEFAULT_PAGE_LIMIT = 20;
 // 审计日志查询上限
 const MAX_AUDIT_LOG_LIMIT = 100;
 const DEFAULT_AUDIT_LOG_LIMIT = 20;
+// 审计日志保留策略：超期删除，同时限制总行数，避免登录失败把表写满
+const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 90;
+const DEFAULT_AUDIT_LOG_MAX_ROWS = 5000;
+const MAX_AUDIT_LOG_RETENTION_DAYS = 3650;
+const MAX_AUDIT_LOG_ROW_CAP = 100000;
 // 批量删除单次上限
 const MAX_BATCH_DELETE = 200;
 
@@ -77,8 +83,8 @@ function initDatabase() {
   // 预编译常用 statements，避免每次调用重新解析 SQL
   stmts = {
     insertShare: db.prepare(`
-      INSERT INTO share_text (id, content, expire_time)
-      VALUES (?, ?, ?)
+      INSERT INTO share_text (id, content, create_time, expire_time)
+      VALUES (?, ?, ?, ?)
     `),
     getById: db.prepare(`
       SELECT id, content, create_time, expire_time, view_count
@@ -155,14 +161,30 @@ function flushPendingWrites() {
  * @param {Date|null} expireTime - 过期时间，null 表示永不过期
  */
 function createShareText(id, content, expireTime) {
-  stmts.insertShare.run(id, content, expireTime ? expireTime.toISOString() : null);
+  stmts.insertShare.run(
+    id,
+    content,
+    new Date().toISOString(),
+    expireTime ? expireTime.toISOString() : null
+  );
+}
+
+function normalizeShareRow(row) {
+  if (!row) return row;
+  if (row.create_time !== undefined) {
+    row.create_time = normalizeDbTimestamp(row.create_time);
+  }
+  if (row.expire_time !== undefined) {
+    row.expire_time = normalizeDbTimestamp(row.expire_time);
+  }
+  return row;
 }
 
 /**
  * 根据 ID 获取分享文本
  */
 function getShareTextById(id) {
-  return stmts.getById.get(id) || null;
+  return normalizeShareRow(stmts.getById.get(id)) || null;
 }
 
 /**
@@ -236,7 +258,7 @@ function getAllShareTexts({ page = 1, limit = DEFAULT_PAGE_LIMIT, search = '' } 
       .all(safeLimit, offset);
   }
 
-  return { total, rows };
+  return { total, rows: rows.map((row) => normalizeShareRow(row)) };
 }
 
 /**
@@ -290,6 +312,60 @@ function createAuditLog({ action, target, detail = null, actorIp = null, userAge
   );
 }
 
+function parsePositiveInt(raw, fallback, max) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > max) return fallback;
+  return value;
+}
+
+/**
+ * 解析审计日志保留策略。非法环境变量回退到默认值。
+ */
+function resolveAuditLogRetention() {
+  return {
+    retentionDays: parsePositiveInt(
+      process.env.AUDIT_LOG_RETENTION_DAYS,
+      DEFAULT_AUDIT_LOG_RETENTION_DAYS,
+      MAX_AUDIT_LOG_RETENTION_DAYS
+    ),
+    maxRows: parsePositiveInt(
+      process.env.AUDIT_LOG_MAX_ROWS,
+      DEFAULT_AUDIT_LOG_MAX_ROWS,
+      MAX_AUDIT_LOG_ROW_CAP
+    ),
+  };
+}
+
+/**
+ * 清理过期或超量的审计日志。
+ * 先按保留天数删除，再只留下最新的 maxRows 条。
+ * @returns {{ deletedByAge: number, deletedByCap: number, retentionDays: number, maxRows: number }}
+ */
+function pruneAuditLogs(options = {}) {
+  const resolved = resolveAuditLogRetention();
+  const retentionDays = options.retentionDays ?? resolved.retentionDays;
+  const maxRows = options.maxRows ?? resolved.maxRows;
+
+  const byAge = db
+    .prepare("DELETE FROM audit_log WHERE datetime(created_time) < datetime('now', ?)")
+    .run(`-${retentionDays} days`);
+
+  const byCap = db
+    .prepare(
+      `DELETE FROM audit_log
+       WHERE id NOT IN (SELECT id FROM audit_log ORDER BY id DESC LIMIT ?)`
+    )
+    .run(maxRows);
+
+  return {
+    deletedByAge: byAge.changes,
+    deletedByCap: byCap.changes,
+    retentionDays,
+    maxRows,
+  };
+}
+
 /**
  * 查询审计日志
  */
@@ -314,7 +390,7 @@ function getAuditLogs({ limit = DEFAULT_AUDIT_LOG_LIMIT } = {}) {
       detail,
       actorIp: row.actor_ip,
       userAgent: row.user_agent,
-      createdTime: row.created_time,
+      createdTime: normalizeDbTimestamp(row.created_time),
     };
   });
 }
@@ -336,10 +412,14 @@ module.exports = {
   getStats,
   createAuditLog,
   getAuditLogs,
+  pruneAuditLogs,
+  resolveAuditLogRetention,
   // 暴露常量供测试与外部使用
   MAX_BATCH_DELETE,
   MAX_ID_RETRIES,
   CONTENT_PREVIEW_LENGTH,
   MAX_PAGE_LIMIT,
   DEFAULT_PAGE_LIMIT,
+  DEFAULT_AUDIT_LOG_RETENTION_DAYS,
+  DEFAULT_AUDIT_LOG_MAX_ROWS,
 };

@@ -83,18 +83,20 @@ docker run -d \
 
 `ALLOWED_ORIGINS` 用于配置 CORS 白名单。未设置或为 `*` 时允许任意来源（兼容默认部署）；多个来源以逗号分隔，例如 `https://app.example.com,https://admin.example.com`，配置后仅这些来源可跨域调用 API。
 
-如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY`、`ADMIN_TOKEN`、`ALLOWED_ORIGINS`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。出于安全考虑，后台令牌默认**仅保存在当前页面内存**，刷新或关闭页面后需要重新登录。
+如果你使用本地配置文件，也可以复制 [.env.example](.env.example) 并填写 `BASE_URL`、`TRUST_PROXY`、`ADMIN_TOKEN`、`ALLOWED_ORIGINS`。管理员后台访问地址为 `/admin/`，只有配置了 `ADMIN_TOKEN` 才能登录。出于安全考虑，后台令牌默认**仅保存在当前页面内存**，刷新或关闭页面后需要重新登录。`AUDIT_LOG_RETENTION_DAYS` 与 `AUDIT_LOG_MAX_ROWS` 可选，用来限制审计日志的保留天数和最大行数。
 
 ### 健康检查
 
-服务暴露 `GET /api/health` 端点，返回 `{ success, status, uptime }`，可作为容器探活与负载均衡探针。Dockerfile 已内置 `HEALTHCHECK` 调用该端点。
+- `GET /api/health/live`：进程存活探针，只要进程还在就返回 200。
+- `GET /api/health/ready`：就绪探针。数据库或缓存不可用时返回 503。Dockerfile 的 `HEALTHCHECK` 调用这个端点，避免数据库故障时容器仍被当成健康实例。
+- `GET /api/health`：兼容旧监控。会附带同样的检查结果，但降级时仍返回 200，`status` 为 `degraded`。不要把它用作摘流量的探针。
 
 ### 安全特性
 
 - 全局响应头：`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Cross-Origin-Opener-Policy`、`Permissions-Policy`；HTTPS 请求额外加 `Strict-Transport-Security`。
 - 前端依赖（marked / DOMPurify / highlight.js）全部本地化，无 CDN 运行时依赖。
 - 管理员 token 先做固定长度摘要再走 `crypto.timingSafeEqual` 比对，避免长度侧信道；后台页面默认不持久化令牌。
-- 后台敏感操作（单删 / 批删 / 清理过期）会写入 `audit_log` 审计表，并可通过 `/api/admin/audit-logs` 查看最近记录。
+- 后台敏感操作（单删 / 批删 / 清理过期）和登录失败会写入 `audit_log` 审计表，并可通过 `/api/admin/audit-logs` 查看最近记录。每日清理任务会删掉超过 `AUDIT_LOG_RETENTION_DAYS`（默认 90 天）的记录，并只保留最新 `AUDIT_LOG_MAX_ROWS`（默认 5000）条。
 - 公开 / 创建 / 分享页 / 管理接口采用分层限流，避免通过页面路由绕过 API 限制。
 - better-sqlite3 启用 WAL 模式，写入即时落盘，无需应用层全量 export+fsync；事务保证原子性。
 - Docker 镜像采用多阶段构建，以 `node` 非 root 用户运行，`npm ci --omit=dev` 走锁文件，并启用运行时加固（`read_only` / `cap_drop: ALL` / `no-new-privileges`）。
@@ -161,6 +163,8 @@ GET /s/:id
 ### 健康检查
 
 ```
+GET /api/health/live
+GET /api/health/ready
 GET /api/health
 ```
 

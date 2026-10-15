@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 // 区分 liveness 与 readiness，避免编排器在 DB 抖动时误杀进程：
 // - /api/health/live  仅校验进程存活，永远返回 200（除非进程已死）
 // - /api/health/ready 校验 DB 连接与缓存状态，失败返回 503
-// - /api/health       综合状态，兼容旧端点与 Dockerfile HEALTHCHECK
+// - /api/health       综合状态，兼容旧监控；失败时仍返回 200。容器探针请用 /ready
 
 app.get('/api/health/live', (_req, res) => {
   res.json({ success: true, status: 'live', uptime: process.uptime() });
